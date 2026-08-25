@@ -1,0 +1,6 @@
+tests/OnboardingTest.class
+tests/SignInTest.class
+base/BaseTest.class
+pages/OnboardingPage.class
+pages/SignupPage.class
+pages/SignInPage.class
