@@ -7,7 +7,10 @@
         <methods>
           <include name="setUp"/>
           <include name="tearDown"/>
+          <include name="testSignupWithCameraImageUpload"/>
+          <include name="testSignupDobValidation"/>
           <include name="testSignupWithEmailAndPassword"/>
+          <include name="testSignupWithGoogle"/>
         </methods>
       </class> <!-- tests.OnboardingTest -->
     </classes>
@@ -19,7 +22,9 @@
           <include name="setUp"/>
           <include name="tearDown"/>
           <include name="testForgotPasswordNavigation"/>
-          <include name="testSignInWithValidCredentials"/>
+          <include name="testSignInWithGoogleFromWelcomeScreen"/>
+          <include name="testSignInWithValidCredentials" invocation-numbers="0 1"/>
+          <include name="testPasswordShowHideToggle"/>
         </methods>
       </class> <!-- tests.SignInTest -->
     </classes>

@@ -1,1 +1,100 @@
 # Knackcity-automation-project
+
+Appium + TestNG UI automation for the Knackcity Android app.
+
+- **Language / build:** Java 11 (compiled), Maven
+- **Automation:** Appium `java-client` 9.2.3, UiAutomator2, Selenium 4.21.0
+- **Runner:** TestNG 7.10.2 via `maven-surefire-plugin`, driven by `testng.xml`
+
+## Test suite
+
+`testng.xml` defines the suite `KnackcityAppiumSuite` with two `<test>` blocks:
+
+| `<test>` | Class | Tests |
+|---|---|---|
+| `OnboardingTests` | `tests.OnboardingTest` | `testNavigateToSignupViaNext`, `testNavigateToSignupViaSkip`, `testSignupWithEmailAndPassword`, `testSignupWithCameraImageUpload`, `testSignupWithGoogle`, `testSignupDobValidation`, `testNavigateToSignInFromSignup` |
+| `SignInTests` | `tests.SignInTest` | `testSignInWithValidCredentials` (runs twice — one row per entry point), `testPasswordShowHideToggle`, `testForgotPasswordNavigation`, `testSignInWithGoogleFromWelcomeScreen` |
+
+## Prerequisites
+
+| Tool | Version used | Check |
+|---|---|---|
+| JDK | 17 (source/target level 11) | `java -version` |
+| Maven | 3.6.3 | `mvn -version` |
+| Appium server | 3.x | `appium -v` |
+| Android SDK platform-tools (`adb`) | — | `adb version` |
+
+Also required:
+
+- A physical Android device connected and authorized, with UDID **`R8VXA01R73Y`**
+  (`adb devices` must list it as `device`).
+- The app under test installed on that device — package **`com.knackcity`**,
+  main activity **`com.knackcity.MainActivity`**.
+
+These values are hardcoded in `src/test/java/base/BaseTest.java` (`APPIUM_URL`,
+`DEVICE_NAME`, `APP_PACKAGE`, `APP_ACTIVITY`). Change them there if your setup differs.
+`BaseTest` also runs `adb -s R8VXA01R73Y shell pm clear com.knackcity` before every
+test to force a deterministic fresh-install starting state, so `adb` must be on `PATH`.
+
+```bash
+# verify prerequisites
+java -version
+mvn -version
+appium -v
+adb devices                                              # must show R8VXA01R73Y  device
+adb -s R8VXA01R73Y shell pm list packages | grep com.knackcity
+```
+
+## Running the suite
+
+### 1. Start the Appium server
+
+In a separate terminal, leave it running:
+
+```bash
+appium --address 127.0.0.1 --port 4723
+```
+
+Verify it is up:
+
+```bash
+curl -s http://127.0.0.1:4723/status
+```
+
+### 2. Run the tests
+
+From the project root (`/home/muhammadzain/Knackcity`):
+
+```bash
+mvn clean test
+```
+
+Surefire is configured with `<suiteXmlFile>testng.xml</suiteXmlFile>`, so `mvn test`
+alone runs the whole suite (`OnboardingTests` then `SignInTests`).
+
+For non-interactive / CI output:
+
+```bash
+mvn -B test
+```
+
+### Useful variations
+
+```bash
+mvn test -Dtest=SignInTest                            # a single test class
+mvn test -Dtest=OnboardingTest#testSignupWithGoogle   # a single test method
+mvn -Dsurefire.suiteXmlFiles=testng.xml test          # explicit suite file
+mvn -e test                                           # add stack traces on failure
+mvn -X test                                           # full debug logging
+```
+
+## Reports
+
+After a run, results are written to `target/surefire-reports/`:
+
+| File | Contents |
+|---|---|
+| `index.html` | HTML summary of the run |
+| `emailable-report.html` | Single-file HTML report |
+| `testng-results.xml` | Machine-readable TestNG results |
+| `KnackcityAppiumSuite/` | Per-`<test>` HTML/XML output |

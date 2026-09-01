@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="tests.OnboardingTest" time="175.767" tests="1" errors="0" skipped="0" failures="1">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="tests.SignInTest" time="1.498" tests="6" errors="0" skipped="5" failures="1">
   <properties>
+    <property name="surefire.suiteXmlFiles" value=""/>
     <property name="java.specification.version" value="17"/>
     <property name="sun.jnu.encoding" value="UTF-8"/>
     <property name="java.class.path" value="/home/muhammadzain/Knackcity/target/test-classes:/home/muhammadzain/Knackcity/target/classes:/home/muhammadzain/.m2/repository/io/appium/java-client/9.2.3/java-client-9.2.3.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-api/4.21.0/selenium-api-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-remote-driver/4.21.0/selenium-remote-driver-4.21.0.jar:/home/muhammadzain/.m2/repository/com/google/auto/service/auto-service-annotations/1.1.1/auto-service-annotations-1.1.1.jar:/home/muhammadzain/.m2/repository/com/google/guava/guava/33.2.0-jre/guava-33.2.0-jre.jar:/home/muhammadzain/.m2/repository/com/google/guava/failureaccess/1.0.2/failureaccess-1.0.2.jar:/home/muhammadzain/.m2/repository/com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar:/home/muhammadzain/.m2/repository/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar:/home/muhammadzain/.m2/repository/org/checkerframework/checker-qual/3.42.0/checker-qual-3.42.0.jar:/home/muhammadzain/.m2/repository/com/google/j2objc/j2objc-annotations/3.0.0/j2objc-annotations-3.0.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/semconv/opentelemetry-semconv/1.25.0-alpha/opentelemetry-semconv-1.25.0-alpha.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-api/1.38.0/opentelemetry-api-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-context/1.38.0/opentelemetry-context-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-exporter-logging/1.38.0/opentelemetry-exporter-logging-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-sdk-common/1.38.0/opentelemetry-sdk-common-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-sdk-extension-autoconfigure-spi/1.38.0/opentelemetry-sdk-extension-autoconfigure-spi-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-sdk-extension-autoconfigure/1.38.0/opentelemetry-sdk-extension-autoconfigure-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-api-incubator/1.38.0-alpha/opentelemetry-api-incubator-1.38.0-alpha.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-sdk-trace/1.38.0/opentelemetry-sdk-trace-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-sdk/1.38.0/opentelemetry-sdk-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-sdk-metrics/1.38.0/opentelemetry-sdk-metrics-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-sdk-logs/1.38.0/opentelemetry-sdk-logs-1.38.0.jar:/home/muhammadzain/.m2/repository/net/bytebuddy/byte-buddy/1.14.15/byte-buddy-1.14.15.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-http/4.21.0/selenium-http-4.21.0.jar:/home/muhammadzain/.m2/repository/dev/failsafe/failsafe/3.3.2/failsafe-3.3.2.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-json/4.21.0/selenium-json-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-manager/4.21.0/selenium-manager-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-os/4.21.0/selenium-os-4.21.0.jar:/home/muhammadzain/.m2/repository/org/apache/commons/commons-exec/1.4.0/commons-exec-1.4.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-support/4.21.0/selenium-support-4.21.0.jar:/home/muhammadzain/.m2/repository/com/google/code/gson/gson/2.11.0/gson-2.11.0.jar:/home/muhammadzain/.m2/repository/com/google/errorprone/error_prone_annotations/2.27.0/error_prone_annotations-2.27.0.jar:/home/muhammadzain/.m2/repository/org/slf4j/slf4j-api/2.0.13/slf4j-api-2.0.13.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-java/4.21.0/selenium-java-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-chrome-driver/4.21.0/selenium-chrome-driver-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-chromium-driver/4.21.0/selenium-chromium-driver-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-devtools-v123/4.21.0/selenium-devtools-v123-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-devtools-v124/4.21.0/selenium-devtools-v124-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-devtools-v125/4.21.0/selenium-devtools-v125-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-devtools-v85/4.21.0/selenium-devtools-v85-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-edge-driver/4.21.0/selenium-edge-driver-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-firefox-driver/4.21.0/selenium-firefox-driver-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-ie-driver/4.21.0/selenium-ie-driver-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-safari-driver/4.21.0/selenium-safari-driver-4.21.0.jar:/home/muhammadzain/.m2/repository/org/testng/testng/7.10.2/testng-7.10.2.jar:/home/muhammadzain/.m2/repository/com/beust/jcommander/1.82/jcommander-1.82.jar:/home/muhammadzain/.m2/repository/org/webjars/jquery/3.7.1/jquery-3.7.1.jar:"/>
@@ -13,9 +14,9 @@
     <property name="sun.java.launcher" value="SUN_STANDARD"/>
     <property name="user.country" value="US"/>
     <property name="sun.boot.library.path" value="/usr/lib/jvm/java-17-openjdk-amd64/lib"/>
-    <property name="sun.java.command" value="/home/muhammadzain/Knackcity/target/surefire/surefirebooter-20260901150505664_3.jar /home/muhammadzain/Knackcity/target/surefire 2026-09-01T15-05-05_536-jvmRun1 surefire-20260901150505664_1tmp surefire_0-20260901150505664_2tmp"/>
+    <property name="sun.java.command" value="/home/muhammadzain/Knackcity/target/surefire/surefirebooter-20260827121947399_3.jar /home/muhammadzain/Knackcity/target/surefire 2026-08-27T12-19-47_274-jvmRun1 surefire-20260827121947399_1tmp surefire_0-20260827121947399_2tmp"/>
     <property name="jdk.debug" value="release"/>
-    <property name="test" value="OnboardingTest#testSignupWithCameraImageUpload"/>
+    <property name="test" value="SignInTest#testSignInWithValidCredentials"/>
     <property name="surefire.test.class.path" value="/home/muhammadzain/Knackcity/target/test-classes:/home/muhammadzain/Knackcity/target/classes:/home/muhammadzain/.m2/repository/io/appium/java-client/9.2.3/java-client-9.2.3.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-api/4.21.0/selenium-api-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-remote-driver/4.21.0/selenium-remote-driver-4.21.0.jar:/home/muhammadzain/.m2/repository/com/google/auto/service/auto-service-annotations/1.1.1/auto-service-annotations-1.1.1.jar:/home/muhammadzain/.m2/repository/com/google/guava/guava/33.2.0-jre/guava-33.2.0-jre.jar:/home/muhammadzain/.m2/repository/com/google/guava/failureaccess/1.0.2/failureaccess-1.0.2.jar:/home/muhammadzain/.m2/repository/com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar:/home/muhammadzain/.m2/repository/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar:/home/muhammadzain/.m2/repository/org/checkerframework/checker-qual/3.42.0/checker-qual-3.42.0.jar:/home/muhammadzain/.m2/repository/com/google/j2objc/j2objc-annotations/3.0.0/j2objc-annotations-3.0.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/semconv/opentelemetry-semconv/1.25.0-alpha/opentelemetry-semconv-1.25.0-alpha.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-api/1.38.0/opentelemetry-api-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-context/1.38.0/opentelemetry-context-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-exporter-logging/1.38.0/opentelemetry-exporter-logging-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-sdk-common/1.38.0/opentelemetry-sdk-common-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-sdk-extension-autoconfigure-spi/1.38.0/opentelemetry-sdk-extension-autoconfigure-spi-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-sdk-extension-autoconfigure/1.38.0/opentelemetry-sdk-extension-autoconfigure-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-api-incubator/1.38.0-alpha/opentelemetry-api-incubator-1.38.0-alpha.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-sdk-trace/1.38.0/opentelemetry-sdk-trace-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-sdk/1.38.0/opentelemetry-sdk-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-sdk-metrics/1.38.0/opentelemetry-sdk-metrics-1.38.0.jar:/home/muhammadzain/.m2/repository/io/opentelemetry/opentelemetry-sdk-logs/1.38.0/opentelemetry-sdk-logs-1.38.0.jar:/home/muhammadzain/.m2/repository/net/bytebuddy/byte-buddy/1.14.15/byte-buddy-1.14.15.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-http/4.21.0/selenium-http-4.21.0.jar:/home/muhammadzain/.m2/repository/dev/failsafe/failsafe/3.3.2/failsafe-3.3.2.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-json/4.21.0/selenium-json-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-manager/4.21.0/selenium-manager-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-os/4.21.0/selenium-os-4.21.0.jar:/home/muhammadzain/.m2/repository/org/apache/commons/commons-exec/1.4.0/commons-exec-1.4.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-support/4.21.0/selenium-support-4.21.0.jar:/home/muhammadzain/.m2/repository/com/google/code/gson/gson/2.11.0/gson-2.11.0.jar:/home/muhammadzain/.m2/repository/com/google/errorprone/error_prone_annotations/2.27.0/error_prone_annotations-2.27.0.jar:/home/muhammadzain/.m2/repository/org/slf4j/slf4j-api/2.0.13/slf4j-api-2.0.13.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-java/4.21.0/selenium-java-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-chrome-driver/4.21.0/selenium-chrome-driver-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-chromium-driver/4.21.0/selenium-chromium-driver-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-devtools-v123/4.21.0/selenium-devtools-v123-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-devtools-v124/4.21.0/selenium-devtools-v124-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-devtools-v125/4.21.0/selenium-devtools-v125-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-devtools-v85/4.21.0/selenium-devtools-v85-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-edge-driver/4.21.0/selenium-edge-driver-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-firefox-driver/4.21.0/selenium-firefox-driver-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-ie-driver/4.21.0/selenium-ie-driver-4.21.0.jar:/home/muhammadzain/.m2/repository/org/seleniumhq/selenium/selenium-safari-driver/4.21.0/selenium-safari-driver-4.21.0.jar:/home/muhammadzain/.m2/repository/org/testng/testng/7.10.2/testng-7.10.2.jar:/home/muhammadzain/.m2/repository/com/beust/jcommander/1.82/jcommander-1.82.jar:/home/muhammadzain/.m2/repository/org/webjars/jquery/3.7.1/jquery-3.7.1.jar:"/>
     <property name="sun.cpu.endian" value="little"/>
     <property name="user.home" value="/home/muhammadzain"/>
@@ -29,7 +30,7 @@
     <property name="line.separator" value="&#10;"/>
     <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
     <property name="java.specification.name" value="Java Platform API Specification"/>
-    <property name="surefire.real.class.path" value="/home/muhammadzain/Knackcity/target/surefire/surefirebooter-20260901150505664_3.jar"/>
+    <property name="surefire.real.class.path" value="/home/muhammadzain/Knackcity/target/surefire/surefirebooter-20260827121947399_3.jar"/>
     <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
     <property name="java.runtime.version" value="17.0.15+6-Ubuntu-0ubuntu120.04"/>
     <property name="user.name" value="muhammadzain"/>
@@ -45,7 +46,6 @@
     <property name="user.dir" value="/home/muhammadzain/Knackcity"/>
     <property name="os.arch" value="amd64"/>
     <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
-    <property name="failIfNoTests" value="false"/>
     <property name="native.encoding" value="UTF-8"/>
     <property name="java.library.path" value="/usr/java/packages/lib:/usr/lib/x86_64-linux-gnu/jni:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/usr/lib/jni:/lib:/usr/lib"/>
     <property name="java.vm.info" value="mixed mode, sharing"/>
@@ -55,18 +55,32 @@
     <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
     <property name="java.class.version" value="61.0"/>
   </properties>
-  <testcase name="testSignupWithCameraImageUpload" classname="tests.OnboardingTest" time="160.85">
-    <failure message="Signup was not successful expected [true] but found [false]" type="java.lang.AssertionError"><![CDATA[java.lang.AssertionError: Signup was not successful expected [true] but found [false]
-	at org.testng.Assert.fail(Assert.java:111)
-	at org.testng.Assert.failNotEquals(Assert.java:1578)
-	at org.testng.Assert.assertTrue(Assert.java:57)
-	at tests.OnboardingTest.testSignupWithCameraImageUpload(OnboardingTest.java:184)
+  <testcase name="setUp" classname="tests.SignInTest" time="1.278">
+    <failure message="Could not start a new session. Possible causes are invalid address of the remote server or browser start-up failure. &#10;Host info: host: &apos;onyxtec21ab-Lenovo-ThinkBook-15-IIL&apos;, ip: &apos;127.0.1.1&apos;&#10;Build info: version: &apos;4.21.0&apos;, revision: &apos;79ed462ef4&apos;&#10;System info: os.name: &apos;Linux&apos;, os.arch: &apos;amd64&apos;, os.version: &apos;5.15.0-139-generic&apos;, java.version: &apos;17.0.15&apos;&#10;Driver info: io.appium.java_client.android.AndroidDriver&#10;Command: [null, newSession {capabilities=[Capabilities {appium:appActivity: com.knackcity.MainActivity, appium:appPackage: com.knackcity, appium:autoGrantPermissions: true, appium:automationName: UiAutomator2, appium:deviceName: R8VXA01R73Y, appium:newCommandTimeout: 120, appium:noReset: true, appium:udid: R8VXA01R73Y, appium:waitForIdleTimeout: 0, platformName: ANDROID}]}]&#10;Capabilities {appium:appActivity: com.knackcity.MainActivity, appium:appPackage: com.knackcity, appium:autoGrantPermissions: true, appium:automationName: UiAutomator2, appium:deviceName: R8VXA01R73Y, appium:newCommandTimeout: 120, appium:noReset: true, appium:udid: R8VXA01R73Y, appium:waitForIdleTimeout: 0, platformName: ANDROID}" type="org.openqa.selenium.SessionNotCreatedException"><![CDATA[org.openqa.selenium.SessionNotCreatedException: 
+Could not start a new session. Possible causes are invalid address of the remote server or browser start-up failure. 
+Host info: host: 'onyxtec21ab-Lenovo-ThinkBook-15-IIL', ip: '127.0.1.1'
+Build info: version: '4.21.0', revision: '79ed462ef4'
+System info: os.name: 'Linux', os.arch: 'amd64', os.version: '5.15.0-139-generic', java.version: '17.0.15'
+Driver info: io.appium.java_client.android.AndroidDriver
+Command: [null, newSession {capabilities=[Capabilities {appium:appActivity: com.knackcity.MainActivity, appium:appPackage: com.knackcity, appium:autoGrantPermissions: true, appium:automationName: UiAutomator2, appium:deviceName: R8VXA01R73Y, appium:newCommandTimeout: 120, appium:noReset: true, appium:udid: R8VXA01R73Y, appium:waitForIdleTimeout: 0, platformName: ANDROID}]}]
+Capabilities {appium:appActivity: com.knackcity.MainActivity, appium:appPackage: com.knackcity, appium:autoGrantPermissions: true, appium:automationName: UiAutomator2, appium:deviceName: R8VXA01R73Y, appium:newCommandTimeout: 120, appium:noReset: true, appium:udid: R8VXA01R73Y, appium:waitForIdleTimeout: 0, platformName: ANDROID}
+	at org.openqa.selenium.remote.RemoteWebDriver.execute(RemoteWebDriver.java:536)
+	at io.appium.java_client.AppiumDriver.startSession(AppiumDriver.java:270)
+	at org.openqa.selenium.remote.RemoteWebDriver.<init>(RemoteWebDriver.java:161)
+	at io.appium.java_client.AppiumDriver.<init>(AppiumDriver.java:91)
+	at io.appium.java_client.AppiumDriver.<init>(AppiumDriver.java:103)
+	at io.appium.java_client.android.AndroidDriver.<init>(AndroidDriver.java:109)
+	at base.BaseTest.setUp(BaseTest.java:60)
 	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
 	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
 	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
 	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
 	at org.testng.internal.invokers.MethodInvocationHelper.invokeMethod(MethodInvocationHelper.java:141)
-	at org.testng.internal.invokers.TestInvoker.invokeMethod(TestInvoker.java:686)
+	at org.testng.internal.invokers.MethodInvocationHelper.invokeMethodConsideringTimeout(MethodInvocationHelper.java:71)
+	at org.testng.internal.invokers.ConfigInvoker.invokeConfigurationMethod(ConfigInvoker.java:400)
+	at org.testng.internal.invokers.ConfigInvoker.invokeConfigurations(ConfigInvoker.java:333)
+	at org.testng.internal.invokers.TestInvoker.runConfigMethods(TestInvoker.java:833)
+	at org.testng.internal.invokers.TestInvoker.invokeMethod(TestInvoker.java:600)
 	at org.testng.internal.invokers.TestInvoker.invokeTestMethod(TestInvoker.java:230)
 	at org.testng.internal.invokers.MethodRunner.runInSequence(MethodRunner.java:63)
 	at org.testng.internal.invokers.TestInvoker$MethodInvocationAgent.invoke(TestInvoker.java:992)
@@ -94,57 +108,58 @@
 	at org.apache.maven.surefire.booter.ForkedBooter.execute(ForkedBooter.java:162)
 	at org.apache.maven.surefire.booter.ForkedBooter.run(ForkedBooter.java:507)
 	at org.apache.maven.surefire.booter.ForkedBooter.main(ForkedBooter.java:495)
+Caused by: java.io.UncheckedIOException: java.net.ConnectException
+	at org.openqa.selenium.remote.http.jdk.JdkHttpClient.execute0(JdkHttpClient.java:439)
+	at io.appium.java_client.internal.filters.AppiumIdempotencyFilter.lambda$apply$0(AppiumIdempotencyFilter.java:35)
+	at io.appium.java_client.internal.filters.AppiumUserAgentFilter.lambda$apply$0(AppiumUserAgentFilter.java:87)
+	at org.openqa.selenium.remote.http.Filter.lambda$andFinally$1(Filter.java:55)
+	at org.openqa.selenium.remote.http.jdk.JdkHttpClient.execute(JdkHttpClient.java:355)
+	at org.openqa.selenium.remote.ProtocolHandshake.createSession(ProtocolHandshake.java:89)
+	at org.openqa.selenium.remote.ProtocolHandshake.createSession(ProtocolHandshake.java:75)
+	at org.openqa.selenium.remote.ProtocolHandshake.createSession(ProtocolHandshake.java:61)
+	at io.appium.java_client.remote.AppiumCommandExecutor.createSession(AppiumCommandExecutor.java:176)
+	at io.appium.java_client.remote.AppiumCommandExecutor.execute(AppiumCommandExecutor.java:237)
+	at org.openqa.selenium.remote.RemoteWebDriver.execute(RemoteWebDriver.java:518)
+	... 43 more
+Caused by: java.net.ConnectException
+	at java.net.http/jdk.internal.net.http.common.Utils.toConnectException(Utils.java:1083)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:198)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.checkRetryConnect(PlainHttpConnection.java:230)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$1(PlainHttpConnection.java:206)
+	at java.base/java.util.concurrent.CompletableFuture.uniHandle(CompletableFuture.java:934)
+	at java.base/java.util.concurrent.CompletableFuture$UniHandle.tryFire(CompletableFuture.java:911)
+	at java.base/java.util.concurrent.CompletableFuture.postComplete(CompletableFuture.java:510)
+	at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1773)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+Caused by: java.nio.channels.ClosedChannelException
+	at java.base/sun.nio.ch.SocketChannelImpl.ensureOpen(SocketChannelImpl.java:195)
+	at java.base/sun.nio.ch.SocketChannelImpl.beginConnect(SocketChannelImpl.java:760)
+	at java.base/sun.nio.ch.SocketChannelImpl.connect(SocketChannelImpl.java:848)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.lambda$connectAsync$0(PlainHttpConnection.java:183)
+	at java.base/java.security.AccessController.doPrivileged(AccessController.java:569)
+	at java.net.http/jdk.internal.net.http.PlainHttpConnection.connectAsync(PlainHttpConnection.java:185)
+	... 9 more
 ]]></failure>
-    <system-out><![CDATA[[BaseTest] Handled initial notification permission dialog (Allow)
-[OnboardingTest] STEP 1: Starting test - Signup with profile image captured via in-app camera
-[OnboardingTest] STEP 2: Completing onboarding via Next x4
-[OnboardingPage] Next click 1 of 4
-[OnboardingPage] Waiting for 'Next button' (attempt 1/3)
-[OnboardingPage] Clicked Next button
-[OnboardingPage] Next click 2 of 4
-[OnboardingPage] Waiting for 'Next button' (attempt 1/3)
-[OnboardingPage] Clicked Next button
-[OnboardingPage] Next click 3 of 4
-[OnboardingPage] Waiting for 'Next button' (attempt 1/3)
-[OnboardingPage] Clicked Next button
-[OnboardingPage] Next click 4 of 4
-[OnboardingPage] Waiting for 'Next button' (attempt 1/3)
-[OnboardingPage] Clicked Next button
-[OnboardingPage] Waiting for 'Get Started button' (attempt 1/3)
-[OnboardingPage] Clicked Get Started button
-[OnboardingTest] STEP 3: Uploading profile image via camera (optional)
-[SignupPage] Clicked 'clickUploadImageButton'
-[SignupPage] Clicked 'clickUseCamera'
-[SignupPage] Handled camera permission popup (Allow while using the app)
-[SignupPage] Clicked 'clickCameraShutterButton'
-[OnboardingTest] Camera profile image upload succeeded
-[OnboardingTest] STEP 4: Filling basic profile fields (full name, screen name, email, DOB, gender)
-[SignupPage] 'Full Name' not visible yet, scrolling down (attempt 1/6)
-[SignupPage] 'Full Name' not visible yet, scrolling down (attempt 2/6)
-[SignupPage] Filled 'Full Name' with 'Hamza Khan'
-[SignupPage] Filled 'Screen Name' with 'hamza'
-[SignupPage] Filled 'Email' with 'hamza@yopmail.com'
-[SignupPage] Clicked 'clickDobField'
-[SignupPage] Scrolled to and selected DOB year 1995 via UiScrollable
-[SignupPage] Confirmed DOB picker (OK)
-[SignupPage] Clicked 'clickGenderField'
-[SignupPage] Clicked 'selectGenderFemale'
-[OnboardingTest] STEP 5: Filling location
-[SignupPage] Filled 'Location' with 'San Francisco'
-[SignupPage] Clicked 'selectLocationFromDropdown'
-[OnboardingTest] STEP 6: Filling phone number and password fields
-[SignupPage] Filled 'Phone Number' with '6503334455'
-[SignupPage] Filled 'Password' with '****'
-[SignupPage] Filled 'Confirm Password' with '****'
-[OnboardingTest] STEP 7: Checking the Terms & Conditions checkbox
-[SignupPage] Clicked 'agreeTermsCheckbox'
-[OnboardingTest] STEP 8: Submitting signup form
-[SignupPage] Clicked 'clickCreateAccountButton'
-[OnboardingTest] STEP 9: Verifying signup success
-]]></system-out>
     <system-err><![CDATA[SLF4J(W): No SLF4J providers were found.
 SLF4J(W): Defaulting to no-operation (NOP) logger implementation
 SLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.
 ]]></system-err>
+  </testcase>
+  <testcase name="setUp" classname="tests.SignInTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="testSignInWithValidCredentials[false, via Signup screen&apos;s Sign In link](1)" classname="tests.SignInTest" time="0.0">
+    <skipped message="Could not start a new session. Possible causes are invalid address of the remote server or browser start-up failure. &#10;Host info: host: &apos;onyxtec21ab-Lenovo-ThinkBook-15-IIL&apos;, ip: &apos;127.0.1.1&apos;&#10;Build info: version: &apos;4.21.0&apos;, revision: &apos;79ed462ef4&apos;&#10;System info: os.name: &apos;Linux&apos;, os.arch: &apos;amd64&apos;, os.version: &apos;5.15.0-139-generic&apos;, java.version: &apos;17.0.15&apos;&#10;Driver info: io.appium.java_client.android.AndroidDriver&#10;Command: [null, newSession {capabilities=[Capabilities {appium:appActivity: com.knackcity.MainActivity, appium:appPackage: com.knackcity, appium:autoGrantPermissions: true, appium:automationName: UiAutomator2, appium:deviceName: R8VXA01R73Y, appium:newCommandTimeout: 120, appium:noReset: true, appium:udid: R8VXA01R73Y, appium:waitForIdleTimeout: 0, platformName: ANDROID}]}]&#10;Capabilities {appium:appActivity: com.knackcity.MainActivity, appium:appPackage: com.knackcity, appium:autoGrantPermissions: true, appium:automationName: UiAutomator2, appium:deviceName: R8VXA01R73Y, appium:newCommandTimeout: 120, appium:noReset: true, appium:udid: R8VXA01R73Y, appium:waitForIdleTimeout: 0, platformName: ANDROID}"/>
+  </testcase>
+  <testcase name="tearDown" classname="tests.SignInTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="tearDown" classname="tests.SignInTest" time="0.0">
+    <skipped/>
+  </testcase>
+  <testcase name="testSignInWithValidCredentials[true, via Welcome screen&apos;s Sign In button](2)" classname="tests.SignInTest" time="0.0">
+    <skipped message="Could not start a new session. Possible causes are invalid address of the remote server or browser start-up failure. &#10;Host info: host: &apos;onyxtec21ab-Lenovo-ThinkBook-15-IIL&apos;, ip: &apos;127.0.1.1&apos;&#10;Build info: version: &apos;4.21.0&apos;, revision: &apos;79ed462ef4&apos;&#10;System info: os.name: &apos;Linux&apos;, os.arch: &apos;amd64&apos;, os.version: &apos;5.15.0-139-generic&apos;, java.version: &apos;17.0.15&apos;&#10;Driver info: io.appium.java_client.android.AndroidDriver&#10;Command: [null, newSession {capabilities=[Capabilities {appium:appActivity: com.knackcity.MainActivity, appium:appPackage: com.knackcity, appium:autoGrantPermissions: true, appium:automationName: UiAutomator2, appium:deviceName: R8VXA01R73Y, appium:newCommandTimeout: 120, appium:noReset: true, appium:udid: R8VXA01R73Y, appium:waitForIdleTimeout: 0, platformName: ANDROID}]}]&#10;Capabilities {appium:appActivity: com.knackcity.MainActivity, appium:appPackage: com.knackcity, appium:autoGrantPermissions: true, appium:automationName: UiAutomator2, appium:deviceName: R8VXA01R73Y, appium:newCommandTimeout: 120, appium:noReset: true, appium:udid: R8VXA01R73Y, appium:waitForIdleTimeout: 0, platformName: ANDROID}"/>
   </testcase>
 </testsuite>
