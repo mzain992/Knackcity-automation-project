@@ -1,13 +1,13 @@
 -------------------------------------------------------------------------------
 Test set: tests.OnboardingTest
 -------------------------------------------------------------------------------
-Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 173.3 s <<< FAILURE! -- in tests.OnboardingTest
-tests.OnboardingTest.testSignupWithEmailAndPassword -- Time elapsed: 162.3 s <<< FAILURE!
+Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 175.8 s <<< FAILURE! -- in tests.OnboardingTest
+tests.OnboardingTest.testSignupWithCameraImageUpload -- Time elapsed: 160.9 s <<< FAILURE!
 java.lang.AssertionError: Signup was not successful expected [true] but found [false]
 	at org.testng.Assert.fail(Assert.java:111)
 	at org.testng.Assert.failNotEquals(Assert.java:1578)
 	at org.testng.Assert.assertTrue(Assert.java:57)
-	at tests.OnboardingTest.testSignupWithEmailAndPassword(OnboardingTest.java:133)
+	at tests.OnboardingTest.testSignupWithCameraImageUpload(OnboardingTest.java:184)
 	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
 	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
 	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)

@@ -42,6 +42,30 @@ public class SignupPage {
     // no trailing-comma quirk here).
     private static final By UPLOAD_IMAGE_BUTTON = By.xpath("//android.view.ViewGroup[@content-desc=\"Upload Image (optional)\"]");
     private static final By CHOOSE_FROM_GALLERY = By.xpath("//android.widget.TextView[@text=\"Choose from Gallery\"]");
+    // Camera branch of the same upload-image picker (sibling option to "Choose from
+    // Gallery"). Locator as supplied for this flow — not yet re-confirmed on-device in
+    // this session (Appium MCP was unavailable), so treat as provisional like the rest
+    // of this block until run once.
+    private static final By USE_CAMERA_OPTION = By.xpath("//android.view.ViewGroup[@content-desc=\"Use Camera\"]");
+    // Camera permission dialog's "Allow only while using the app" button, as supplied.
+    // Distinct element from PERMISSION_ALLOW_BUTTONS' by-id lookup of the same
+    // resource-id; kept separate since this flow's steps were given explicitly by xpath.
+    private static final By CAMERA_PERMISSION_ALLOW_FOREGROUND_ONLY =
+            By.xpath("//android.widget.Button[@resource-id=\"com.android.permissioncontroller:id/permission_allow_foreground_only_button\"]");
+    // In-app camera's shutter button, as supplied.
+    private static final By CAMERA_SHUTTER_BUTTON =
+            By.xpath("//android.view.ViewGroup[@resource-id=\"in-app-camera-shutter-button\"]/android.view.ViewGroup");
+    // Confirmed on-device: the shutter takes the picture and drops straight onto a uCrop
+    // "Edit Photo" screen (resource-id="com.knackcity:id/ucrop_photobox"). Its toolbar has
+    // two actions — the "Navigate up" ImageButton (top-left, CANCELS the crop and returns
+    // to the signup form with NO image set) and the "Crop" Button
+    // (resource-id="com.knackcity:id/menu_crop", top-right, ACCEPTS the crop and returns
+    // the image to the form). The requested flow deliberately exercises both: capture,
+    // cancel via Navigate up, re-capture, then accept via Crop.
+    private static final By CAMERA_CAPTURED_IMAGE_CLOSE_BUTTON =
+            By.xpath("//android.widget.ImageButton[@content-desc=\"Navigate up\"]");
+    private static final By CAMERA_CROP_BUTTON =
+            By.xpath("//*[@resource-id=\"com.knackcity:id/menu_crop\"]");
 
     // Common Android runtime-permission dialog buttons (system permission controller).
     // Tried in order; whichever appears first is accepted. Android 14+'s photo-picker
@@ -86,6 +110,10 @@ public class SignupPage {
     // exposes, consistent with this codebase's preference for resource-id where available.
     private static final By GENDER_INPUT_WRAPPER = By.xpath("//*[@resource-id=\"signup-gender-input\"]");
     private static final By GENDER_OPTION_MALE = By.xpath("//*[@resource-id=\"signup-gender-option-male\"]");
+    // Follows the same resource-id pattern as the confirmed Male option
+    // ("signup-gender-option-<value>"); not independently re-confirmed on-device this
+    // session (Appium MCP was unavailable).
+    private static final By GENDER_OPTION_FEMALE = By.xpath("//*[@resource-id=\"signup-gender-option-female\"]");
     private static final By BIO_FIELD = By.xpath("//android.widget.EditText[@text=\"Enter your bio\"]");
     private static final By LOCATION_FIELD = By.xpath("//android.widget.EditText[@text=\"Search your address\"]");
     private static final By LOCATION_DROPDOWN_SAN_FRANCISCO = By.xpath("//android.widget.TextView[@text=\"San Francisco, CA, USA\"]");
@@ -397,6 +425,78 @@ public class SignupPage {
         return true;
     }
 
+    public boolean clickUseCamera() {
+        return click(USE_CAMERA_OPTION, "clickUseCamera");
+    }
+
+    public boolean handleCameraPermissionIfNeeded() {
+        WebDriverWait permissionWait = new WebDriverWait(driver, PERMISSION_WAIT);
+        try {
+            WebElement button = permissionWait.until(ExpectedConditions.elementToBeClickable(CAMERA_PERMISSION_ALLOW_FOREGROUND_ONLY));
+            button.click();
+            System.out.println("[SignupPage] Handled camera permission popup (Allow while using the app)");
+            pauseForAction();
+            return true;
+        } catch (Exception e) {
+            System.out.println("[SignupPage] No camera permission popup appeared (or already granted).");
+            return false;
+        }
+    }
+
+    public boolean clickCameraShutterButton() {
+        return click(CAMERA_SHUTTER_BUTTON, "clickCameraShutterButton");
+    }
+
+    public boolean closeCapturedCameraImage() {
+        return click(CAMERA_CAPTURED_IMAGE_CLOSE_BUTTON, "closeCapturedCameraImage");
+    }
+
+    public boolean cropCapturedCameraImage() {
+        return click(CAMERA_CROP_BUTTON, "cropCapturedCameraImage");
+    }
+
+    /** Opens the picker, chooses Use Camera, grants the permission prompt if shown, taps the shutter. */
+    private boolean openCameraAndCapture() {
+        if (!clickUploadImageButton()) {
+            return false;
+        }
+        if (!clickUseCamera()) {
+            return false;
+        }
+        handleCameraPermissionIfNeeded(); // best-effort; no-op if no permission prompt appears
+        return clickCameraShutterButton();
+    }
+
+    /**
+     * Full optional-image-upload flow via the in-app camera, per the requested steps:
+     * capture a photo, close it via "Navigate up" (which cancels the crop and returns to
+     * the signup form with no image set), capture again, then confirm with "Crop" to
+     * select the image. Best-effort, mirroring uploadFirstAvailablePhotoFromGallery — on
+     * any failure it presses back to recover to the signup form so a failed optional step
+     * can't strand later steps (or the next test) on a stuck camera/crop screen.
+     */
+    public boolean uploadPhotoFromCamera() {
+        // First capture — then discard it via the crop screen's "Navigate up" button.
+        if (!openCameraAndCapture()) {
+            recoverToApp();
+            return false;
+        }
+        if (!closeCapturedCameraImage()) {
+            recoverToApp();
+            return false;
+        }
+        // Second capture — this one is kept: confirm the crop to select the image.
+        if (!openCameraAndCapture()) {
+            recoverToApp();
+            return false;
+        }
+        if (!cropCapturedCameraImage()) {
+            recoverToApp();
+            return false;
+        }
+        return true;
+    }
+
     // ---------------- Form fields ----------------
 
     public boolean enterFullName(String name) {
@@ -512,6 +612,21 @@ public class SignupPage {
             return false;
         }
         return selectGenderMale();
+    }
+
+    public boolean selectGenderFemale() {
+        return click(GENDER_OPTION_FEMALE, "selectGenderFemale");
+    }
+
+    /**
+     * Opens the Gender dropdown and selects Female in one call, mirroring selectGender()
+     * (Male) above.
+     */
+    public boolean selectGenderAsFemale() {
+        if (!clickGenderField()) {
+            return false;
+        }
+        return selectGenderFemale();
     }
 
     public boolean enterBio(String bio) {

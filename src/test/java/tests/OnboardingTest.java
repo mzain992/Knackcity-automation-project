@@ -1,6 +1,7 @@
 package tests;
 
 import base.BaseTest;
+import java.time.Year;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import pages.OnboardingPage;
@@ -132,6 +133,72 @@ public class OnboardingTest extends BaseTest {
         logStep("STEP 9: Verifying signup success");
         Assert.assertTrue(signupPage.isSignupSuccessful(), "Signup was not successful");
         logStep("TEST PASSED: Signup with email and password completed successfully");
+    }
+
+    @Test
+    public void testSignupWithCameraImageUpload() {
+        logStep("STEP 1: Starting test - Signup with profile image captured via in-app camera");
+        OnboardingPage onboardingPage = new OnboardingPage(driver);
+        SignupPage signupPage = new SignupPage(driver);
+
+        logStep("STEP 2: Completing onboarding via Next x4");
+        onboardingPage.clickNextButtonFourTimes();
+        pauseBetweenSteps();
+        onboardingPage.clickGetStartedButton();
+        pauseBetweenSteps();
+        Assert.assertTrue(signupPage.isSignupScreenDisplayed(),
+                "Signup screen was not displayed after onboarding");
+
+        logStep("STEP 3: Uploading profile image via in-app camera (capture -> close via Navigate up -> "
+                + "capture again -> Crop to select)");
+        Assert.assertTrue(signupPage.uploadPhotoFromCamera(),
+                "Failed to capture and select a profile image via the in-app camera");
+        pauseBetweenSteps();
+
+        // Screen name, email AND phone must all be unique per run — the app rejects
+        // duplicates ("This screen name is already taken.", "This email already exists.",
+        // "The phone has already been taken."). A time-based 5-digit suffix is shared
+        // across all three so a single run's values stay recognisable together.
+        //   - screen-name field caps at 12 chars: "sohaib" (6) + 5 digits = 11, fits.
+        //   - phone field caps at 10 digits: "40124" (5) + 5 digits = 10, fits, and keeps
+        //     the 4012478xxx shape of the numbers originally supplied.
+        String uniqueSuffix = String.format("%05d", System.currentTimeMillis() % 100000);
+        String screenName = "sohaib" + uniqueSuffix;
+        String email = "sohaib" + uniqueSuffix + "@yopmail.com";
+        String phoneNumber = "40124" + uniqueSuffix;
+
+        logStep("STEP 4: Filling basic profile fields (full name, screen name, email, DOB, gender, bio)");
+        Assert.assertTrue(signupPage.enterFullName("rana sohaib"), "Failed to enter full name");
+        Assert.assertTrue(signupPage.enterScreenName(screenName), "Failed to enter screen name");
+        Assert.assertTrue(signupPage.enterEmail(email), "Failed to enter email");
+        Assert.assertTrue(signupPage.selectDateOfBirth(String.valueOf(Year.now().getValue())),
+                "Failed to select date of birth");
+        Assert.assertTrue(signupPage.selectGenderAsFemale(), "Failed to select gender");
+        signupPage.enterBio("i am the best tester"); // optional field
+        pauseBetweenSteps();
+
+        logStep("STEP 5: Filling location");
+        Assert.assertTrue(signupPage.enterLocation("San Francisco"), "Failed to enter location");
+        Assert.assertTrue(signupPage.selectLocationFromDropdown(), "Failed to select location from dropdown");
+        pauseBetweenSteps();
+
+        logStep("STEP 6: Filling phone number and password fields");
+        Assert.assertTrue(signupPage.enterPhoneNumber(phoneNumber), "Failed to enter phone number");
+        Assert.assertTrue(signupPage.enterPassword("Zain@123"), "Failed to enter password");
+        Assert.assertTrue(signupPage.enterConfirmPassword("Zain@123"), "Failed to enter confirm password");
+        pauseBetweenSteps();
+
+        logStep("STEP 7: Checking the Terms & Conditions checkbox");
+        Assert.assertTrue(signupPage.agreeTermsCheckbox(), "Failed to check the Terms & Conditions checkbox");
+        pauseBetweenSteps();
+
+        logStep("STEP 8: Submitting signup form");
+        Assert.assertTrue(signupPage.clickCreateAccountButton(), "Failed to click Create Account button");
+        pauseBetweenSteps();
+
+        logStep("STEP 9: Verifying signup success");
+        Assert.assertTrue(signupPage.isSignupSuccessful(), "Signup was not successful");
+        logStep("TEST PASSED: Signup with camera-captured profile image completed successfully");
     }
 
     @Test
