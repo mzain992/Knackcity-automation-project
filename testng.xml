@@ -8,6 +8,7 @@
                     <include name="testNavigateToSignupViaNext"/>
                     <include name="testNavigateToSignupViaSkip"/>
                     <include name="testSignupWithEmailAndPassword"/>
+                    <include name="testSignupWithCameraImageUpload"/>
                     <include name="testSignupWithGoogle"/>
                     <include name="testSignupDobValidation"/>
                     <include name="testNavigateToSignInFromSignup"/>
