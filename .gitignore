@@ -1,0 +1,27 @@
+# --- Maven / build output ---
+target/
+*.class
+
+# --- Test / run artifacts ---
+*.log
+test-output/
+allure-results/
+screenshots/
+
+# --- IDE: IntelliJ / Eclipse / VS Code ---
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.vscode/
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+
+# --- Claude Code local state ---
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks/
