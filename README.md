@@ -13,7 +13,7 @@ Appium + TestNG UI automation for the Knackcity Android app.
 | `<test>` | Class | Tests |
 |---|---|---|
 | `OnboardingTests` | `tests.OnboardingTest` | `testNavigateToSignupViaNext`, `testNavigateToSignupViaSkip`, `testSignupWithEmailAndPassword`, `testSignupWithCameraImageUpload`, `testSignupWithGoogle`, `testSignupDobValidation`, `testNavigateToSignInFromSignup` |
-| `SignInTests` | `tests.SignInTest` | `testSignInWithValidCredentials` (runs twice — one row per entry point), `testPasswordShowHideToggle`, `testForgotPasswordNavigation`, `testSignInWithGoogleFromWelcomeScreen` |
+| `SignInTests` | `tests.SignInTest` | `testSignInWithValidCredentials` (runs twice — one row per entry point), `testSignInWithInvalidEmailAndValidPassword`, `testSignInWithValidEmailAndInvalidPassword`, `testSignInWithInvalidEmailAndInvalidPassword`, `testSignInWithUnregisteredEmail`, `testSignInPasswordIsCaseSensitive`, `testSignInWithEmptyEmailAndValidPassword`, `testSignInWithValidEmailAndEmptyPassword`, `testSignInWithBothFieldsEmpty`, `testSignInWithMalformedEmailFormat`, `testPasswordShowHideToggle`, `testForgotPasswordNavigation`, `testSignInWithGoogleFromWelcomeScreen` |
 
 ## Prerequisites
 

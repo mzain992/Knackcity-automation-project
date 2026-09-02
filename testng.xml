@@ -21,6 +21,15 @@
             <class name="tests.SignInTest">
                 <methods>
                     <include name="testSignInWithValidCredentials"/>
+                    <include name="testSignInWithInvalidEmailAndValidPassword"/>
+                    <include name="testSignInWithValidEmailAndInvalidPassword"/>
+                    <include name="testSignInWithInvalidEmailAndInvalidPassword"/>
+                    <include name="testSignInWithUnregisteredEmail"/>
+                    <include name="testSignInPasswordIsCaseSensitive"/>
+                    <include name="testSignInWithEmptyEmailAndValidPassword"/>
+                    <include name="testSignInWithValidEmailAndEmptyPassword"/>
+                    <include name="testSignInWithBothFieldsEmpty"/>
+                    <include name="testSignInWithMalformedEmailFormat"/>
                     <include name="testPasswordShowHideToggle"/>
                     <include name="testForgotPasswordNavigation"/>
                     <include name="testSignInWithGoogleFromWelcomeScreen"/>
