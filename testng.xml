@@ -16,6 +16,21 @@
             </class>
         </classes>
     </test>
+    <test name="ForgotPasswordTests">
+        <classes>
+            <class name="tests.ForgotPasswordTest">
+                <methods>
+                    <!--
+                        End-to-end Forgot Password flow. Requires a human to type the OTP
+                        on the device: the test waits out the 60s resend cooldown, then
+                        polls for a manually-entered OTP (bounded by -DotpEntryWaitSeconds,
+                        default 180s) before tapping Verify Code.
+                    -->
+                    <include name="testForgotPasswordEndToEndFlow"/>
+                </methods>
+            </class>
+        </classes>
+    </test>
     <test name="SignInTests">
         <classes>
             <class name="tests.SignInTest">

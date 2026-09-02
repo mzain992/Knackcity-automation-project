@@ -13,6 +13,7 @@ Appium + TestNG UI automation for the Knackcity Android app.
 | `<test>` | Class | Tests |
 |---|---|---|
 | `OnboardingTests` | `tests.OnboardingTest` | `testNavigateToSignupViaNext`, `testNavigateToSignupViaSkip`, `testSignupWithEmailAndPassword`, `testSignupWithCameraImageUpload`, `testSignupWithGoogle`, `testSignupDobValidation`, `testNavigateToSignInFromSignup` |
+| `ForgotPasswordTests` | `tests.ForgotPasswordTest` | `testForgotPasswordEndToEndFlow` — full reset journey: Forgot Password → Back → Forgot Password → enter email → Send Verification Code → OTP screen → 60s cooldown → Resend OTP → **manual OTP entry** → Verify Code → "Email Verified successfully" → New Password screen (confirm-mismatch validation) → show/hide → Reset Password → Sign In screen → login with the new password. **Requires a human to type the OTP on the device.** |
 | `SignInTests` | `tests.SignInTest` | `executeSignInTestCases` — one reusable method, run **twice** (one data-provider row per Sign In entry point). Each run navigates to Sign In and executes the full plan: **TC-01** valid sign-in, **TC-02** invalid email + valid password, **TC-03** valid email + invalid password, **TC-04** invalid email + invalid password, **TC-05** empty email, **TC-06** empty password, **TC-07** both empty, **TC-08** invalid email format, **TC-09** password show/hide, **TC-10** password case-sensitivity, **TC-11** unregistered email, **TC-12** Sign in with Google, plus **Forgot Password** navigation. Sub-cases run sequentially and are isolated — all failures are collected and reported together at the end. |
 
 ### Sign In entry points
@@ -27,6 +28,21 @@ Appium + TestNG UI automation for the Knackcity Android app.
 TC-01 and TC-12 (the two cases that actually authenticate) run last, so a single in-session
 app restart — `BaseTest.restartAppWithClearedData()` — is enough to get back to Sign In for
 the following case.
+
+### Forgot Password test — notes
+
+`ForgotPasswordTest` is a manual-assisted end-to-end test:
+
+- **OTP is entered by hand on the device.** The test waits explicitly for the "Resend OTP"
+  option (the 60s server cooldown), taps Resend, then polls the OTP field until a 4+ digit
+  code appears (bounded by `-DotpEntryWaitSeconds`, default 180) before tapping Verify Code.
+- **The new password must be one this account has not used before** — the backend silently
+  rejects a previously-used value on "Reset Password". Set it with
+  `-DforgotNewPassword=<value>` (default `Onyx@123`), and pick a fresh one per run.
+- Run it on its own: `mvn test -Dtest=ForgotPasswordTest -DforgotNewPassword=Fresh@123`.
+- Reuses `OnboardingPage` (reach Sign In), `SignInPage` (open "Forgot Password?", final
+  login), and adds `pages.ForgotPasswordPage` for the reset-specific screens. No existing
+  Sign-In / onboarding / Google code is modified.
 
 ## Prerequisites
 
