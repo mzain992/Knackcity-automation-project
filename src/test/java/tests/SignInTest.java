@@ -1,6 +1,8 @@
 package tests;
 
 import base.BaseTest;
+import java.util.ArrayList;
+import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -9,35 +11,88 @@ import pages.SignInPage;
 import pages.SignupPage;
 
 /**
- * Sign In screen coverage.
+ * End-to-end Sign In coverage — test plan cases TC-01 … TC-12, plus the Forgot Password
+ * navigation check.
  *
- * Positive path (valid email + valid password) and the Google sign-in path each land on
- * the shared home screen ("Welcome to Knackcity!"). Every other case here is a negative
- * one — wrong email, wrong password, empty fields, bad email format, wrong-case password,
- * unregistered account — and all of them assert the same thing: the app must NOT reach
- * the home screen and must stay on the Sign In screen. That check (isSignInUnsuccessful())
- * is deliberately independent of the exact error message the app shows, so the tests stay
- * green even if the wording changes; the visible error text, when present, is only logged.
+ * <h2>Two entry points, one identical screen</h2>
+ * The app reaches the SAME Sign In screen two different ways:
+ * <ol>
+ *   <li><b>Entry Point 1 — Welcome screen:</b> tap the Welcome screen's own "Sign In"
+ *       button ({@code //android.view.ViewGroup[@content-desc="Sign In"]}).</li>
+ *   <li><b>Entry Point 2 — Get Started screen:</b> tap "Get Started", then on the Signup
+ *       screen tap its "Sign In" link ({@code //android.widget.TextView[@text="Sign In"]}).</li>
+ * </ol>
+ *
+ * <h2>One reusable method, run per entry point</h2>
+ * Rather than duplicating a dozen test cases per entry point, the whole plan lives in
+ * {@link #executeSignInTestCases(SignInEntryPoint)}. A TestNG {@link DataProvider} invokes
+ * it once per entry point, <b>sequentially</b>. Each invocation:
+ * <ul>
+ *   <li>navigates to Sign In through its entry point,</li>
+ *   <li>runs the negative / validation / navigation cases (TC-02…TC-11 + Forgot Password) —
+ *       these all leave the app ON the Sign In screen, so they chain with no app restart,</li>
+ *   <li>then runs TC-01 and TC-12 last — the only two cases that actually authenticate and
+ *       leave for the home screen, so exactly one in-session app restart is needed.</li>
+ * </ul>
+ *
+ * <h2>Isolation &amp; reporting</h2>
+ * Every sub-case runs inside {@link #runTestCase}, which records a pass/fail instead of
+ * aborting the whole run, then best-effort recovers to a usable Sign In screen. All
+ * failures are collected and raised together at the end, so one broken case never hides
+ * the others.
+ *
+ * <h2>Why the negative assertions don't check the exact error text</h2>
+ * For every "must be rejected" case the assertion is simply <i>"the app did not
+ * authenticate and stayed on the Sign In screen"</i> ({@link SignInPage#isSignInUnsuccessful()}).
+ * That keeps the tests stable across error-copy changes; any visible inline error is only
+ * logged, for diagnostics.
  */
 public class SignInTest extends BaseTest {
 
-    private static final long STEP_DELAY_MS = 2000;
+    /**
+     * Fixed pause between visible UI steps. Kept short — the real synchronisation is done
+     * by the explicit {@code WebDriverWait}s inside the page objects; this only gives the
+     * UI a beat to settle between deliberate actions and keeps the run watchable.
+     */
+    private static final long STEP_DELAY_MS = 1500;
 
-    // ---- Credentials under test ----
-    // Registered account: valid email + valid password -> should sign in.
+    // ------------------------------------------------------------------------------------
+    // Test data — latest valid credentials per the test plan.
+    // ------------------------------------------------------------------------------------
+    /** TC-01 / TC-05 / TC-06 / TC-11 — the one registered account that must sign in. */
     private static final String VALID_EMAIL = "najam1@yopmail.com";
     private static final String VALID_PASSWORD = "Zain@123";
-    // Well-formed but NOT the registered address (typo of the real one — missing the "1").
+    /** TC-02 / TC-04 — well-formed address but NOT registered (real one is "najam1@…"). */
     private static final String INVALID_EMAIL = "najam@yopmail.com";
-    // Well-formed, valid domain, but no account exists for it.
-    private static final String UNREGISTERED_EMAIL = "johndoe@yopmail.com";
-    // Not a valid email format at all (double @).
-    private static final String MALFORMED_EMAIL = "abc@@gmail.com";
-    // Wrong password for VALID_EMAIL.
+    /** TC-03 / TC-04 — wrong password for {@link #VALID_EMAIL}. */
     private static final String INVALID_PASSWORD = "zain321";
-    // Right characters as VALID_PASSWORD but wrong case ("z" vs "Z") — proves the password
-    // check is case-sensitive.
+    /** TC-08 — not a valid e-mail format at all (double "@"). */
+    private static final String MALFORMED_EMAIL = "abc@@gmail.com";
+    /** TC-10 — the exact characters of {@link #VALID_PASSWORD} but wrong case → must fail. */
     private static final String WRONG_CASE_PASSWORD = "zain@123";
+    /** TC-11 — well-formed, valid domain, but no account exists for it. */
+    private static final String UNREGISTERED_EMAIL = "johndoe@yopmail.com";
+
+    /** The two ways to reach the (identical) Sign In screen. */
+    private enum SignInEntryPoint {
+        /** Welcome screen's own "Sign In" button. */
+        WELCOME_SCREEN,
+        /** Welcome screen → "Get Started" → Signup screen's "Sign In" link. */
+        GET_STARTED_SCREEN
+    }
+
+    /** Set at the start of each {@link #executeSignInTestCases} run; used by recovery/restart. */
+    private SignInEntryPoint currentEntryPoint;
+
+    /** A sub-case body that is allowed to throw (checked exceptions and assertion errors). */
+    @FunctionalInterface
+    private interface TestCaseBody {
+        void run() throws Exception;
+    }
+
+    // ==================================================================================
+    // Small helpers
+    // ==================================================================================
 
     private void pauseBetweenSteps() {
         try {
@@ -47,271 +102,280 @@ public class SignInTest extends BaseTest {
         }
     }
 
-    private void logStep(String message) {
+    private void log(String message) {
         System.out.println("[SignInTest] " + message);
     }
 
-    /**
-     * The app has two separate buttons that both lead to the exact same Sign In screen:
-     * the Welcome screen's own "Sign In" button, and the Signup screen's "Sign In" link.
-     * Every session starts fresh on the onboarding carousel (BaseTest clears app data
-     * before each test), so this one helper covers both routes rather than duplicating
-     * the Sign In screen tests per entry point — the screen being tested is identical
-     * either way, only how you arrive there differs.
-     */
-    private SignInPage navigateToSignInScreen() {
-        return navigateToSignInScreen(false);
+    /** Human-readable rendering of a possibly-blank credential, for logs and messages. */
+    private static String describe(String value) {
+        return (value == null || value.isEmpty()) ? "<empty>" : value;
     }
 
-    private SignInPage navigateToSignInScreen(boolean viaWelcomeScreen) {
+    // ==================================================================================
+    // The reusable Sign In test method
+    // ==================================================================================
+
+    /** One data-provider row per entry point — TestNG runs them sequentially. */
+    @DataProvider(name = "signInEntryPoints")
+    public Object[][] signInEntryPoints() {
+        return new Object[][]{
+                {SignInEntryPoint.WELCOME_SCREEN},
+                {SignInEntryPoint.GET_STARTED_SCREEN}
+        };
+    }
+
+    /**
+     * THE reusable Sign In test method. Runs the full TC-01…TC-12 plan (plus Forgot
+     * Password) against whichever entry point the data provider supplies. Called once per
+     * entry point so both receive identical functional coverage with no duplicated code.
+     */
+    @Test(dataProvider = "signInEntryPoints")
+    public void executeSignInTestCases(SignInEntryPoint entryPoint) {
+        currentEntryPoint = entryPoint;
+        log("############################################################");
+        log("#  Sign In test plan  —  entry point: " + entryPoint);
+        log("############################################################");
+
+        // Navigate once up-front; every sub-case re-syncs itself to the Sign In screen from here.
+        navigateToSignIn(entryPoint);
+
+        List<String> failures = new ArrayList<>();
+
+        // ---- Negative / validation / navigation cases: these stay on the Sign In screen ----
+        runTestCase(failures, "TC-02", "Invalid email + valid password → rejected",
+                () -> assertSignInRejected(INVALID_EMAIL, VALID_PASSWORD));
+        runTestCase(failures, "TC-03", "Valid email + invalid password → rejected",
+                () -> assertSignInRejected(VALID_EMAIL, INVALID_PASSWORD));
+        runTestCase(failures, "TC-04", "Invalid email + invalid password → rejected",
+                () -> assertSignInRejected(INVALID_EMAIL, INVALID_PASSWORD));
+        runTestCase(failures, "TC-05", "Empty email + valid password → rejected",
+                () -> assertSignInRejected("", VALID_PASSWORD));
+        runTestCase(failures, "TC-06", "Valid email + empty password → rejected",
+                () -> assertSignInRejected(VALID_EMAIL, ""));
+        runTestCase(failures, "TC-07", "Both fields empty → rejected",
+                () -> assertSignInRejected("", ""));
+        runTestCase(failures, "TC-08", "Invalid email format (abc@@gmail.com) → rejected",
+                () -> assertSignInRejected(MALFORMED_EMAIL, VALID_PASSWORD));
+        runTestCase(failures, "TC-09", "Password show / hide toggle",
+                this::assertPasswordShowHideWorks);
+        runTestCase(failures, "TC-10", "Password is case-sensitive → wrong-case rejected",
+                () -> assertSignInRejected(VALID_EMAIL, WRONG_CASE_PASSWORD));
+        runTestCase(failures, "TC-11", "Unregistered email → rejected",
+                () -> assertSignInRejected(UNREGISTERED_EMAIL, VALID_PASSWORD));
+        runTestCase(failures, "TC-FP", "Forgot Password link navigates away and back",
+                this::assertForgotPasswordNavigation);
+
+        // ---- Positive cases last: they authenticate and leave the Sign In screen ----
+        runTestCase(failures, "TC-01", "Valid email + valid password → sign-in succeeds",
+                this::assertSignInSucceeds);
+        runTestCase(failures, "TC-12", "Sign in with Google → sign-in succeeds",
+                this::assertGoogleSignInSucceeds);
+
+        // ---- Summary ----
+        log("================  SUMMARY (" + entryPoint + ")  ================");
+        if (failures.isEmpty()) {
+            log("ALL Sign In test cases PASSED for entry point " + entryPoint);
+        } else {
+            log(failures.size() + " Sign In test case(s) FAILED for entry point " + entryPoint + ":");
+            failures.forEach(f -> log("   - " + f));
+            Assert.fail(failures.size() + " Sign In case(s) failed via " + entryPoint + ": " + failures);
+        }
+    }
+
+    /**
+     * Runs one sub-case in isolation: logs a banner, executes the body, records PASS/FAIL,
+     * and — on failure — best-effort recovers to a usable Sign In screen so the remaining
+     * cases still get a fair run. Catches {@link Throwable} so a failed TestNG assertion
+     * inside a case is recorded, not propagated.
+     */
+    private void runTestCase(List<String> failures, String id, String title, TestCaseBody body) {
+        log("------------------------------------------------------------");
+        log(id + " : " + title);
+        log("------------------------------------------------------------");
+        try {
+            body.run();
+            log(id + " : PASSED");
+        } catch (Throwable t) {
+            log(id + " : FAILED — " + t.getMessage());
+            failures.add(id + " (" + title + "): " + t.getMessage());
+            recoverToSignInScreen();
+        }
+    }
+
+    // ==================================================================================
+    // Navigation
+    // ==================================================================================
+
+    /**
+     * Drives the app from its freshly-cleared launch state (onboarding carousel) to the
+     * Sign In screen through the given entry point, asserting the screen actually appears.
+     */
+    private SignInPage navigateToSignIn(SignInEntryPoint entryPoint) {
         OnboardingPage onboardingPage = new OnboardingPage(driver);
         SignInPage signInPage = new SignInPage(driver);
 
-        if (viaWelcomeScreen) {
-            logStep("Navigating: onboarding -> Sign In (direct from the Welcome screen)");
-            onboardingPage.clickNextButtonFourTimes();
-            pauseBetweenSteps();
+        log("Navigating to Sign In via " + entryPoint);
+
+        // Both entry points first get past the onboarding carousel to the Welcome screen.
+        onboardingPage.clickSkipButton();
+        pauseBetweenSteps();
+
+        if (entryPoint == SignInEntryPoint.WELCOME_SCREEN) {
+            // Entry Point 1: tap the Welcome screen's own "Sign In" button.
             onboardingPage.clickSignInButton();
-            pauseBetweenSteps();
         } else {
+            // Entry Point 2: Welcome → "Get Started" → Signup screen → its "Sign In" link.
             SignupPage signupPage = new SignupPage(driver);
-            logStep("Navigating: onboarding -> Get Started -> Signup -> Sign In link");
-            onboardingPage.clickSkipButton();
-            pauseBetweenSteps();
             onboardingPage.clickGetStartedButton();
             pauseBetweenSteps();
-            Assert.assertTrue(signupPage.isSignupScreenDisplayed(), "Signup screen was not displayed after onboarding");
-            Assert.assertTrue(signupPage.clickSignInLink(), "Failed to click Sign In link on the signup screen");
-            pauseBetweenSteps();
+            Assert.assertTrue(signupPage.isSignupScreenDisplayed(),
+                    "Signup screen was not displayed after tapping Get Started");
+            Assert.assertTrue(signupPage.clickSignInLink(),
+                    "Failed to tap the 'Sign In' link on the Signup screen");
         }
+        pauseBetweenSteps();
 
-        Assert.assertTrue(signInPage.isSignInScreenDisplayed(), "Sign In screen was not displayed");
+        Assert.assertTrue(signInPage.isSignInScreenDisplayed(),
+                "Sign In screen was not displayed after navigating via " + entryPoint);
         return signInPage;
     }
 
     /**
-     * Shared driver for every "this should be rejected" case. Navigates to Sign In, fills
-     * the two fields (null / "" => leave that field blank), taps Sign In, then asserts the
-     * app did NOT log in. A Sign In button that isn't even clickable (form blocking the
-     * submit) is an acceptable outcome here, not a failure — the assertion is purely
-     * "we never reached the home screen and we're still on Sign In".
+     * Returns a Sign In page ready for the next sub-case:
+     * <ul>
+     *   <li>if we're still on the Sign In screen (the usual case — every negative test
+     *       leaves us here), returns immediately; the next {@code enterEmail}/{@code
+     *       enterPassword} clears the fields before typing;</li>
+     *   <li>otherwise (a previous positive case authenticated and left for the home
+     *       screen) restarts the app with cleared data and re-navigates via the current
+     *       entry point.</li>
+     * </ul>
      */
-    private void assertSignInRejected(String email, String password, String scenario) {
-        logStep("STEP 1: Starting test - " + scenario);
-        SignInPage signInPage = navigateToSignInScreen();
-
-        logStep("STEP 2: Entering credentials");
-        Assert.assertTrue(signInPage.enterEmail(email), "Failed to enter email");
-        Assert.assertTrue(signInPage.enterPassword(password), "Failed to enter password");
-        pauseBetweenSteps();
-
-        logStep("STEP 3: Tapping Sign In");
-        boolean clicked = signInPage.clickSignInButton();
-        logStep("Sign In button " + (clicked
-                ? "clicked"
-                : "was not clickable — form blocked the submit (acceptable for this case)"));
-        pauseBetweenSteps();
-
-        logStep("STEP 4: Verifying the app rejected the attempt");
-        String error = signInPage.getVisibleErrorText();
-        if (error != null) {
-            logStep("Inline error shown: \"" + error + "\"");
+    private SignInPage freshSignInScreen() {
+        SignInPage signInPage = new SignInPage(driver);
+        if (signInPage.isOnSignInScreenNow()) {
+            return signInPage;
         }
+        log("No longer on the Sign In screen — restarting app and re-navigating via " + currentEntryPoint);
+        restartAppWithClearedData();
+        return navigateToSignIn(currentEntryPoint);
+    }
+
+    /** Best-effort recovery used after a sub-case throws. Never itself fails the run. */
+    private void recoverToSignInScreen() {
+        try {
+            freshSignInScreen();
+        } catch (Throwable t) {
+            log("Recovery to the Sign In screen failed (continuing anyway): " + t.getMessage());
+        }
+    }
+
+    // ==================================================================================
+    // Sub-case bodies
+    // ==================================================================================
+
+    /**
+     * Shared body for every "this must be refused" case (TC-02…TC-08, TC-10, TC-11).
+     * Enters the given credentials (null / "" ⇒ leave that field blank), taps Sign In,
+     * and asserts the app did NOT authenticate and stayed on the Sign In screen. A Sign In
+     * button that isn't even clickable (the form blocking its own submit) is an accepted
+     * outcome here, not a failure.
+     */
+    private void assertSignInRejected(String email, String password) throws Exception {
+        SignInPage signInPage = freshSignInScreen();
+
+        log("Entering credentials — email=[" + describe(email) + "], password=[" + describe(password) + "]");
+        if (!signInPage.enterEmail(email)) {
+            throw new AssertionError("could not type into the email field");
+        }
+        if (!signInPage.enterPassword(password)) {
+            throw new AssertionError("could not type into the password field");
+        }
+        pauseBetweenSteps();
+
+        boolean clicked = signInPage.clickSignInButton();
+        log("Sign In button " + (clicked
+                ? "tapped"
+                : "was not clickable — form blocked its own submit (accepted for this case)"));
+        pauseBetweenSteps();
+
+        String inlineError = signInPage.getVisibleErrorText();
+        if (inlineError != null) {
+            log("Inline validation / auth error shown: \"" + inlineError + "\"");
+        }
+
         Assert.assertTrue(signInPage.isSignInUnsuccessful(),
-                "App appears to have signed in despite invalid input (" + scenario + ")");
-        logStep("TEST PASSED: sign-in correctly rejected (" + scenario + ")");
+                "App appears to have signed in despite invalid input (email=" + describe(email)
+                        + ", password=" + describe(password) + ")");
+        log("Correctly rejected — still on the Sign In screen");
     }
 
-    // =====================================================================================
-    // Positive path
-    // =====================================================================================
+    /** TC-01 — valid email + valid password must reach the post-auth screen. */
+    private void assertSignInSucceeds() throws Exception {
+        SignInPage signInPage = freshSignInScreen();
 
-    /**
-     * The Sign In screen is reachable from two entry points that lead to the exact same
-     * screen: the Welcome screen's own "Sign In" button, and the Signup screen's "Sign In"
-     * link. Rather than duplicating the credentials test per entry point, this data
-     * provider drives one shared @Test method across both — TestNG runs it twice (once
-     * per row) and reports each as a distinct invocation of the same test case.
-     */
-    @DataProvider(name = "signInEntryPoints")
-    public Object[][] signInEntryPoints() {
-        return new Object[][]{
-                {false, "via Signup screen's Sign In link"},
-                {true, "via Welcome screen's Sign In button"}
-        };
-    }
-
-    /** Valid email + valid password -> successful login. */
-    @Test(dataProvider = "signInEntryPoints")
-    public void testSignInWithValidCredentials(boolean viaWelcomeScreen, String entryPointDescription) {
-        logStep("STEP 1: Starting test - Sign in with valid credentials (" + entryPointDescription + ")");
-        SignInPage signInPage = navigateToSignInScreen(viaWelcomeScreen);
-
-        logStep("STEP 2: Entering email and password");
         Assert.assertTrue(signInPage.enterEmail(VALID_EMAIL), "Failed to enter email");
         Assert.assertTrue(signInPage.enterPassword(VALID_PASSWORD), "Failed to enter password");
         pauseBetweenSteps();
 
-        logStep("STEP 3: Clicking Sign In");
-        Assert.assertTrue(signInPage.clickSignInButton(), "Failed to click Sign In button");
+        Assert.assertTrue(signInPage.clickSignInButton(), "Failed to tap the Sign In button");
         pauseBetweenSteps();
 
-        logStep("STEP 4: Verifying successful login/navigation");
-        Assert.assertTrue(signInPage.isSignInSuccessful(), "Sign in did not succeed");
-        logStep("TEST PASSED: Signed in successfully");
+        Assert.assertTrue(signInPage.isSignInSuccessful(),
+                "Sign in with valid credentials did not reach the post-auth screen");
+        log("Signed in successfully with valid credentials");
     }
 
-    // =====================================================================================
-    // Negative path - invalid credential combinations
-    // =====================================================================================
+    /** TC-09 — field starts masked, eye icon reveals it, tapping again re-masks it. */
+    private void assertPasswordShowHideWorks() throws Exception {
+        SignInPage signInPage = freshSignInScreen();
 
-    /** Invalid (unregistered/typo) email + valid password -> rejected. */
-    @Test
-    public void testSignInWithInvalidEmailAndValidPassword() {
-        assertSignInRejected(INVALID_EMAIL, VALID_PASSWORD, "invalid email + valid password");
-    }
-
-    /** Valid email + wrong password -> rejected. */
-    @Test
-    public void testSignInWithValidEmailAndInvalidPassword() {
-        assertSignInRejected(VALID_EMAIL, INVALID_PASSWORD, "valid email + invalid password");
-    }
-
-    /** Invalid email + wrong password -> rejected. */
-    @Test
-    public void testSignInWithInvalidEmailAndInvalidPassword() {
-        assertSignInRejected(INVALID_EMAIL, INVALID_PASSWORD, "invalid email + invalid password");
-    }
-
-    /** Well-formed but unregistered email + valid password -> rejected (no such account). */
-    @Test
-    public void testSignInWithUnregisteredEmail() {
-        assertSignInRejected(UNREGISTERED_EMAIL, VALID_PASSWORD, "unregistered email");
-    }
-
-    /**
-     * Password check must be case-sensitive: the exact characters of VALID_PASSWORD but
-     * with the wrong case ("zain@123" vs "Zain@123") must be rejected.
-     */
-    @Test
-    public void testSignInPasswordIsCaseSensitive() {
-        assertSignInRejected(VALID_EMAIL, WRONG_CASE_PASSWORD, "valid email + wrong-case password");
-    }
-
-    // =====================================================================================
-    // Negative path - empty fields
-    // =====================================================================================
-
-    /** Empty email + valid password -> rejected (email is mandatory). */
-    @Test
-    public void testSignInWithEmptyEmailAndValidPassword() {
-        assertSignInRejected("", VALID_PASSWORD, "empty email + valid password");
-    }
-
-    /** Valid email + empty password -> rejected (password is mandatory). */
-    @Test
-    public void testSignInWithValidEmailAndEmptyPassword() {
-        assertSignInRejected(VALID_EMAIL, "", "valid email + empty password");
-    }
-
-    /** Both fields empty -> rejected. */
-    @Test
-    public void testSignInWithBothFieldsEmpty() {
-        assertSignInRejected("", "", "email and password both empty");
-    }
-
-    // =====================================================================================
-    // Negative path - email format validation
-    // =====================================================================================
-
-    /** Malformed email format ("abc@@gmail.com") + valid password -> rejected. */
-    @Test
-    public void testSignInWithMalformedEmailFormat() {
-        assertSignInRejected(MALFORMED_EMAIL, VALID_PASSWORD, "malformed email format");
-    }
-
-    // =====================================================================================
-    // Password show/hide icon
-    // =====================================================================================
-
-    @Test
-    public void testPasswordShowHideToggle() {
-        logStep("STEP 1: Starting test - Password show/hide toggle");
-        SignInPage signInPage = navigateToSignInScreen();
-
-        logStep("STEP 2: Entering password");
         Assert.assertTrue(signInPage.enterPassword(VALID_PASSWORD), "Failed to enter password");
         pauseBetweenSteps();
 
-        logStep("STEP 3: Verifying password starts masked");
-        Assert.assertTrue(signInPage.isPasswordMasked(), "Password field was not masked by default");
+        Assert.assertTrue(signInPage.isPasswordMasked(), "Password was not masked by default");
 
-        logStep("STEP 4: Tapping the eye icon to reveal the password");
-        Assert.assertTrue(signInPage.togglePasswordVisibility(), "Failed to click the eye icon");
+        Assert.assertTrue(signInPage.togglePasswordVisibility(), "Failed to tap the eye icon (show)");
         pauseBetweenSteps();
-        Assert.assertFalse(signInPage.isPasswordMasked(), "Password was still masked after tapping the eye icon");
+        Assert.assertFalse(signInPage.isPasswordMasked(), "Password still masked after tapping 'show'");
 
-        logStep("STEP 5: Tapping the eye icon again to re-mask the password");
-        Assert.assertTrue(signInPage.togglePasswordVisibility(), "Failed to click the eye icon a second time");
+        Assert.assertTrue(signInPage.togglePasswordVisibility(), "Failed to tap the eye icon (hide)");
         pauseBetweenSteps();
-        Assert.assertTrue(signInPage.isPasswordMasked(), "Password was not re-masked after tapping the eye icon again");
-
-        logStep("TEST PASSED: Password show/hide toggle works correctly");
+        Assert.assertTrue(signInPage.isPasswordMasked(), "Password not re-masked after tapping 'hide'");
+        log("Password show/hide toggle works");
     }
 
-    // =====================================================================================
-    // Forgot Password navigation
-    // =====================================================================================
+    /**
+     * TC-FP — the "Forgot Password?" link leaves the Sign In screen, and its back button
+     * returns to it. (Detailed Forgot Password flow coverage is a separate concern; here
+     * we only prove the navigation both ways so the link isn't broken.)
+     */
+    private void assertForgotPasswordNavigation() throws Exception {
+        SignInPage signInPage = freshSignInScreen();
 
-    @Test
-    public void testForgotPasswordNavigation() {
-        logStep("STEP 1: Starting test - Forgot Password navigation");
-        SignInPage signInPage = navigateToSignInScreen();
-
-        logStep("STEP 2: Clicking Forgot Password?");
-        Assert.assertTrue(signInPage.clickForgotPassword(), "Failed to click Forgot Password? link");
+        Assert.assertTrue(signInPage.clickForgotPassword(), "Failed to tap the 'Forgot Password?' link");
         pauseBetweenSteps();
-
-        logStep("STEP 3: Verifying navigation occurred (left the Sign In screen)");
         Assert.assertFalse(signInPage.isStillOnSignInScreenAfterForgotPasswordClick(),
-                "Forgot Password? did not navigate away from the Sign In screen");
+                "'Forgot Password?' did not navigate away from the Sign In screen");
 
-        logStep("STEP 4: Clicking the back button on the Forgot Password screen");
-        Assert.assertTrue(signInPage.clickForgotPasswordBackButton(), "Failed to click the Forgot Password back button");
+        Assert.assertTrue(signInPage.clickForgotPasswordBackButton(),
+                "Failed to tap the back button on the Forgot Password screen");
         pauseBetweenSteps();
-
-        logStep("STEP 5: Verifying return to the Sign In screen");
-        Assert.assertTrue(signInPage.isSignInScreenDisplayed(), "Did not return to the Sign In screen after clicking back");
-
-        logStep("STEP 6: Verifying the Sign In flow still works correctly after returning");
-        Assert.assertTrue(signInPage.enterEmail(VALID_EMAIL), "Failed to enter email");
-        Assert.assertTrue(signInPage.enterPassword(VALID_PASSWORD), "Failed to enter password");
-        pauseBetweenSteps();
-        Assert.assertTrue(signInPage.clickSignInButton(), "Failed to click Sign In button");
-        pauseBetweenSteps();
-        Assert.assertTrue(signInPage.isSignInSuccessful(), "Sign in did not succeed after returning from Forgot Password");
-        logStep("TEST PASSED: Forgot Password back button returns to Sign In, and Sign In still works correctly");
+        Assert.assertTrue(signInPage.isSignInScreenDisplayed(),
+                "Did not return to the Sign In screen after tapping back");
+        log("Forgot Password navigates away and back correctly");
     }
 
-    // =====================================================================================
-    // Google sign-in
-    // =====================================================================================
+    /** TC-12 — Google sign-in from this entry point must reach the post-auth screen. */
+    private void assertGoogleSignInSucceeds() throws Exception {
+        SignInPage signInPage = freshSignInScreen();
 
-    @Test
-    public void testSignInWithGoogleFromWelcomeScreen() {
-        logStep("STEP 1: Starting test - Sign in with Google, reached directly from the Welcome screen");
-        SignInPage signInPage = navigateToSignInScreen(true);
-
-        logStep("STEP 2: Clicking Continue with Google");
-        Assert.assertTrue(signInPage.clickContinueWithGoogle(), "Failed to click Continue with Google");
+        Assert.assertTrue(signInPage.signInWithGoogle(),
+                "Failed to drive the 'Continue with Google' flow");
         pauseBetweenSteps();
 
-        logStep("STEP 3: Selecting the first Google account");
-        Assert.assertTrue(signInPage.selectFirstGoogleAccount(), "Failed to select a Google account");
-        pauseBetweenSteps();
-
-        logStep("STEP 4: Verifying successful sign-in");
-        Assert.assertTrue(signInPage.isSignInSuccessful(), "Sign in with Google was not successful");
-        logStep("TEST PASSED: Signed in with Google directly from the Welcome screen");
+        Assert.assertTrue(signInPage.isSignInSuccessful(),
+                "Sign in with Google did not reach the post-auth screen");
+        log("Signed in successfully with Google");
     }
 }

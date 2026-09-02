@@ -20,19 +20,12 @@
         <classes>
             <class name="tests.SignInTest">
                 <methods>
-                    <include name="testSignInWithValidCredentials"/>
-                    <include name="testSignInWithInvalidEmailAndValidPassword"/>
-                    <include name="testSignInWithValidEmailAndInvalidPassword"/>
-                    <include name="testSignInWithInvalidEmailAndInvalidPassword"/>
-                    <include name="testSignInWithUnregisteredEmail"/>
-                    <include name="testSignInPasswordIsCaseSensitive"/>
-                    <include name="testSignInWithEmptyEmailAndValidPassword"/>
-                    <include name="testSignInWithValidEmailAndEmptyPassword"/>
-                    <include name="testSignInWithBothFieldsEmpty"/>
-                    <include name="testSignInWithMalformedEmailFormat"/>
-                    <include name="testPasswordShowHideToggle"/>
-                    <include name="testForgotPasswordNavigation"/>
-                    <include name="testSignInWithGoogleFromWelcomeScreen"/>
+                    <!--
+                        Single reusable method — the TestNG data provider runs it once per
+                        Sign In entry point (Welcome screen, then Get Started screen), and
+                        each run executes the full TC-01…TC-12 plan plus Forgot Password.
+                    -->
+                    <include name="executeSignInTestCases"/>
                 </methods>
             </class>
         </classes>

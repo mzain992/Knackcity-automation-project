@@ -162,16 +162,26 @@ public class SignupPage {
     // Create account
     // Confirmed on-device: resource-id="signup-submit", content-desc="Create Account".
     private static final By CREATE_ACCOUNT_BUTTON = By.xpath("//*[@resource-id=\"signup-submit\"]");
-    // Confirmed on-device: successful signup (manual or Google) lands on the shared home
-    // screen greeting, e.g. "Hi <name>" / "Welcome to Knackcity!". The greeting name text
-    // varies per account, so this anchors on the static "Welcome to Knackcity!" TextView.
-    private static final By SIGNUP_SUCCESS_MARKER = By.xpath("//android.widget.TextView[@text=\"Welcome to Knackcity!\"]");
+    // Confirmed on-device (screen dump after a real Sign In, which shares this flow):
+    // successful auth lands on a post-auth interstitial — heading "Welcome to KnackCity!",
+    // body "You're all set! ...", and a "Start Exploring" button — NOT a "Welcome to
+    // Knackcity!" home greeting. "Welcome to Knack..." also appears on the PRE-auth Welcome
+    // screen, so it can't be the marker; "Start Exploring" / "You're all set" are unique to
+    // the post-auth screen. Kept in sync with SignInPage.SIGNIN_SUCCESS_MARKER.
+    private static final By SIGNUP_SUCCESS_MARKER = By.xpath(
+            "//android.widget.TextView[@text=\"Start Exploring\" or starts-with(@text,\"You're all set\")]");
 
-    // Sign In (link back to the Sign In screen from Signup)
-    // Same wrapper pattern as elsewhere: the clickable node is the ViewGroup, not the
-    // inner TextView. Confirmed on-device on the actual Sign In screen's own "Sign In"
-    // submit button; this signup-screen link follows the same app-wide button pattern.
-    private static final By SIGN_IN_LINK = By.xpath("//android.view.ViewGroup[@content-desc=\"Sign In\"]");
+    // Sign In (link back to the Sign In screen from Signup — Sign-In "Entry Point 2":
+    // Welcome -> Get Started -> Signup screen -> this "Sign In" link).
+    // The visible label is a TextView, //android.widget.TextView[@text="Sign In"], but in
+    // this app tappable labels are wrapped in a clickable ViewGroup (the inner TextView is
+    // usually not itself clickable). This union targets, in order: the label's nearest
+    // clickable ancestor-or-self, the content-desc wrapper used elsewhere, and finally the
+    // bare label — the first that resolves clickable wins.
+    private static final By SIGN_IN_LINK = By.xpath(
+            "//android.widget.TextView[@text=\"Sign In\"]/ancestor-or-self::*[@clickable=\"true\"][1]"
+                    + " | //android.view.ViewGroup[@content-desc=\"Sign In\"]"
+                    + " | //android.widget.TextView[@text=\"Sign In\"]");
 
     // Google login
     // Confirmed on-device: the clickable node is the ViewGroup wrapper (content-desc exact,

@@ -128,6 +128,32 @@ public class BaseTest {
         }
     }
 
+    /**
+     * Restarts the app to a deterministic freshly-installed state WITHOUT tearing down the
+     * Appium session. Needed by tests that chain several sub-scenarios in a single session
+     * (e.g. {@code SignInTest.executeSignInTestCases}) once one of those sub-scenarios has
+     * actually authenticated and navigated away from the screen under test — clearing app
+     * data and relaunching is the only reliable way back to the onboarding carousel from
+     * the post-login home screen. Mirrors what {@link #setUp()} does per test, minus
+     * creating a new driver.
+     */
+    protected void restartAppWithClearedData() {
+        System.out.println("[BaseTest] Restarting app with cleared data (in-session reset)");
+        try {
+            driver.terminateApp(APP_PACKAGE);
+        } catch (Exception e) {
+            System.out.println("[BaseTest] terminateApp failed (continuing): " + e.getMessage());
+        }
+        dismissAnyLingeringSystemDialogs();
+        clearAppData();
+        try {
+            driver.activateApp(APP_PACKAGE);
+        } catch (Exception e) {
+            System.out.println("[BaseTest] activateApp failed: " + e.getMessage());
+        }
+        handleInitialPermissionDialogIfPresent();
+    }
+
     @AfterMethod
     public void tearDown() {
         if (driver != null) {

@@ -14,7 +14,13 @@ public class OnboardingPage {
     private static final Duration SHORT_WAIT = Duration.ofSeconds(3);
     private static final Duration PERMISSION_WAIT = Duration.ofSeconds(5);
     private static final Duration TRANSITION_WAIT = Duration.ofSeconds(2);
-    private static final int MAX_RETRIES = 3;
+    // Bumped 3 -> 5. On a fresh cold start (BaseTest clears app data every test) the
+    // onboarding carousel can take well over 30s to become interactive — the app shows a
+    // splash + an always-animating SVG, and a late system permission dialog can sit on top
+    // of it. 3 x 10s was measured on-device to sometimes not be enough, spuriously failing
+    // navigation before the test logic ran. Each retry now also re-dismisses any permission
+    // dialog and settles briefly (see waitForElementWithRetry).
+    private static final int MAX_RETRIES = 5;
 
     private final AndroidDriver driver;
     private final WebDriverWait wait;
@@ -24,7 +30,10 @@ public class OnboardingPage {
     // value (@content-desc="Next, ") — confirmed on-device it returns zero results even though
     // the node genuinely exists — so this uses contains() instead, which matches reliably.
     private static final By NEXT_BUTTON = By.xpath("//android.view.ViewGroup[contains(@content-desc,\"Next\")]");
-    private static final By SKIP_BUTTON = By.xpath("//android.view.ViewGroup[@content-desc=\"Skip\"]");
+    // Use contains() rather than an exact match — same trailing ", " quirk documented for
+    // NEXT_BUTTON above (React Native joins nested Text labels with ", "). Exact-matching
+    // @content-desc="Skip" was an intermittent source of "Skip button not found" failures.
+    private static final By SKIP_BUTTON = By.xpath("//android.view.ViewGroup[contains(@content-desc,\"Skip\")]");
 
     // On every fresh app launch (BaseTest clears app data before each test), Android may
     // show a system runtime-permission dialog before the onboarding carousel is even
@@ -40,7 +49,8 @@ public class OnboardingPage {
     // resource-id; Sign In follows the app-wide ViewGroup-wrapper pattern (content-desc
     // exact, no trailing-comma quirk). Both confirmed on-device.
     private static final By GET_STARTED_BUTTON = By.xpath("//*[@resource-id=\"get-started-button\"]");
-    private static final By SIGN_IN_BUTTON = By.xpath("//android.view.ViewGroup[@content-desc=\"Sign In\"]");
+    // contains() for the same trailing ", " reason as NEXT_BUTTON / SKIP_BUTTON.
+    private static final By SIGN_IN_BUTTON = By.xpath("//android.view.ViewGroup[contains(@content-desc,\"Sign In\")]");
 
     // Once Get Started has been clicked once, noReset=true means later sessions in the same
     // suite run boot straight into the signup form itself, skipping both the carousel AND
@@ -60,7 +70,15 @@ public class OnboardingPage {
                 return wait.until(ExpectedConditions.elementToBeClickable(locator));
             } catch (Exception e) {
                 lastException = e;
-                System.out.println("[OnboardingPage] '" + elementName + "' not found on attempt " + attempt + ": " + e.getMessage());
+                // Keep the log to one line — the full Selenium dump is noise on a retry.
+                System.out.println("[OnboardingPage] '" + elementName + "' not clickable yet (attempt "
+                        + attempt + "/" + MAX_RETRIES + ")");
+                if (attempt < MAX_RETRIES) {
+                    // A late-appearing system permission dialog is the most common thing
+                    // sitting on top of the carousel; clear it, settle, then retry.
+                    handleInitialPermissionIfPresent();
+                    pauseForTransition();
+                }
             }
         }
         throw new RuntimeException("[OnboardingPage] '" + elementName + "' not found after " + MAX_RETRIES + " attempts", lastException);

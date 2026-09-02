@@ -24,7 +24,16 @@ public class SignInPage {
 
     // ---------------- Locators ----------------
 
-    private static final By EMAIL_FIELD = By.xpath("//android.widget.EditText[@text=\"Enter your email\"]");
+    // Matches the email field whether it is empty or already filled. An EditText's @text
+    // attribute holds the PLACEHOLDER only while the field is empty and switches to the
+    // typed value once something is entered, so "@text='Enter your email'" alone stops
+    // matching after the first keystroke — which broke re-use of the field when several
+    // sign-in scenarios run back-to-back in one session. The Sign In screen has exactly
+    // two EditTexts (email then password), so the first one is unambiguously the email
+    // field; the placeholder match is kept as the primary (most explicit) branch and the
+    // positional match as the content-independent fallback.
+    private static final By EMAIL_FIELD = By.xpath(
+            "//android.widget.EditText[@text=\"Enter your email\"] | (//android.widget.EditText)[1]");
     // BUG FIX: previously anchored on the password="true"/"false" attribute, but that
     // attribute is present on EVERY EditText (it's "false" on Email too, not just the
     // actual password field), so this filter matched *any* text field — with no index,
@@ -55,10 +64,16 @@ public class SignInPage {
     // ViewGroup wrapper (content-desc exact), not the inner TextView. Confirmed on-device.
     private static final By SIGN_IN_BUTTON = By.xpath("//android.view.ViewGroup[@content-desc=\"Sign In\"]");
 
-    // Confirmed on-device: successful sign-in lands on the same shared home screen as
-    // successful signup — "Welcome to Knackcity!" (the greeting name above it varies per
-    // account, so this anchors on the static line instead).
-    private static final By SIGNIN_SUCCESS_MARKER = By.xpath("//android.widget.TextView[@text=\"Welcome to Knackcity!\"]");
+    // Confirmed on-device (screen dump after a real login): a successful sign-in lands on
+    // a post-auth interstitial — heading "Welcome to KnackCity!", body "You're all set!
+    // Discover nearby spots, connect with your community, and explore what's happening
+    // around you.", and a "Start Exploring" button. The earlier marker looked for a
+    // "Welcome to Knackcity!" home greeting that never appears here (and "Welcome to
+    // Knack..." also shows on the PRE-login Welcome screen, so it can't be used). "Start
+    // Exploring" / "You're all set" are unique to the post-auth screen.
+    private static final By SIGNIN_SUCCESS_MARKER = By.xpath(
+            "//android.widget.TextView[@text=\"Start Exploring\" or starts-with(@text,\"You're all set\")]");
+    private static final By START_EXPLORING_BUTTON = By.xpath("//*[@text=\"Start Exploring\"]");
 
     // Best-effort locator for any inline validation / auth-failure text the Sign In screen
     // shows on a rejected attempt. The app renders field errors as TextViews with a
@@ -81,6 +96,13 @@ public class SignInPage {
                     + " or contains(translate(@text,\"" + UPPER + "\",\"" + LOWER + "\"),\"does not exist\")]");
 
     private static final By CONTINUE_WITH_GOOGLE = By.xpath("//android.widget.TextView[@text=\"Continue with Google\"]");
+    // After picking an account Google may show a one-off consent / "to continue to
+    // Knackcity" screen with a Continue (or Allow) button. It does not always appear
+    // (already-authorised accounts skip straight through), so this is only ever tapped
+    // best-effort with a short timeout.
+    private static final By GOOGLE_CONSENT_CONTINUE_BUTTON = By.xpath(
+            "//android.widget.Button[@text=\"Continue\" or @text=\"Allow\" or @text=\"Agree\"]"
+                    + " | //*[@content-desc=\"Continue\"]");
     // Native Google account chooser. The row for each account is a
     // clickable LinearLayout[resource-id="container"], but the exact node this xpath
     // targets is a non-clickable inner LinearLayout — confirmed on-device that tapping it
@@ -194,6 +216,25 @@ public class SignInPage {
         }
     }
 
+    /**
+     * Best-effort click with a caller-chosen (usually short) timeout: taps the element if
+     * it shows up, silently does nothing if it doesn't. Used for optional steps such as
+     * the Google consent screen that may or may not appear.
+     */
+    private boolean clickIfPresent(By locator, String actionName, Duration timeout) {
+        try {
+            WebElement element = new WebDriverWait(driver, timeout)
+                    .until(ExpectedConditions.elementToBeClickable(locator));
+            element.click();
+            System.out.println("[SignInPage] Clicked optional '" + actionName + "'");
+            pauseForAction();
+            return true;
+        } catch (Exception e) {
+            System.out.println("[SignInPage] Optional '" + actionName + "' did not appear — skipping");
+            return false;
+        }
+    }
+
     /** Quick presence check with a caller-chosen timeout (for negative-path assertions). */
     private boolean isPresentWithin(By locator, Duration timeout) {
         try {
@@ -221,6 +262,16 @@ public class SignInPage {
      */
     public boolean isSignInScreenDisplayed() {
         return isDisplayed(PASSWORD_FIELD);
+    }
+
+    /**
+     * Fast variant of {@link #isSignInScreenDisplayed()} (3s, no visibility wait) for the
+     * hot path where a caller just needs to know "are we still on Sign In, or did the last
+     * scenario navigate away?" without paying the full 15s explicit-wait timeout on a
+     * negative answer.
+     */
+    public boolean isOnSignInScreenNow() {
+        return isPresentWithin(PASSWORD_FIELD, Duration.ofSeconds(3));
     }
 
     // ---------------- Form fields ----------------
@@ -301,9 +352,18 @@ public class SignInPage {
         }
     }
 
-    /** Positive path: waits up to the full explicit timeout for the home screen to load. */
+    /**
+     * Positive path: waits up to the full explicit timeout for the post-auth interstitial
+     * ("Start Exploring" / "You're all set"). On success it also taps "Start Exploring" so
+     * the app is left on the actual home screen rather than the interstitial — keeps the
+     * device in a clean state for whatever runs next.
+     */
     public boolean isSignInSuccessful() {
-        return isDisplayed(SIGNIN_SUCCESS_MARKER);
+        boolean ok = isDisplayed(SIGNIN_SUCCESS_MARKER);
+        if (ok) {
+            click(START_EXPLORING_BUTTON, "startExploring"); // best-effort; harmless if already dismissed
+        }
+        return ok;
     }
 
     /**
@@ -343,5 +403,26 @@ public class SignInPage {
 
     public boolean selectFirstGoogleAccount() {
         return click(FIRST_GOOGLE_ACCOUNT, "selectFirstGoogleAccount");
+    }
+
+    /**
+     * Full "Continue with Google" sign-in flow: taps the in-app button, then handles the
+     * native Google account chooser and the optional consent screen. Only the first tap
+     * is mandatory — the chooser is skipped when there is a single/last-used account and
+     * the consent screen is skipped for already-authorised accounts, so those two steps
+     * are best-effort. Verify the actual outcome with {@link #isSignInSuccessful()}.
+     *
+     * @return false only if the in-app "Continue with Google" button could not be tapped.
+     */
+    public boolean signInWithGoogle() {
+        if (!clickContinueWithGoogle()) {
+            return false;
+        }
+        pauseForAction();
+        // Account chooser — present when more than one / no default account.
+        clickIfPresent(FIRST_GOOGLE_ACCOUNT, "selectFirstGoogleAccount", Duration.ofSeconds(8));
+        // One-off consent / "to continue to Knackcity" screen — present on first authorise.
+        clickIfPresent(GOOGLE_CONSENT_CONTINUE_BUTTON, "googleConsentContinue", Duration.ofSeconds(6));
+        return true;
     }
 }
