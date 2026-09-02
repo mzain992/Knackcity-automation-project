@@ -8,11 +8,36 @@ import pages.OnboardingPage;
 import pages.SignInPage;
 import pages.SignupPage;
 
+/**
+ * Sign In screen coverage.
+ *
+ * Positive path (valid email + valid password) and the Google sign-in path each land on
+ * the shared home screen ("Welcome to Knackcity!"). Every other case here is a negative
+ * one — wrong email, wrong password, empty fields, bad email format, wrong-case password,
+ * unregistered account — and all of them assert the same thing: the app must NOT reach
+ * the home screen and must stay on the Sign In screen. That check (isSignInUnsuccessful())
+ * is deliberately independent of the exact error message the app shows, so the tests stay
+ * green even if the wording changes; the visible error text, when present, is only logged.
+ */
 public class SignInTest extends BaseTest {
 
     private static final long STEP_DELAY_MS = 2000;
-    private static final String VALID_EMAIL = "irfanrehan635+1@gmail.com";
-    private static final String VALID_PASSWORD = "Test@905";
+
+    // ---- Credentials under test ----
+    // Registered account: valid email + valid password -> should sign in.
+    private static final String VALID_EMAIL = "najam1@yopmail.com";
+    private static final String VALID_PASSWORD = "Zain@123";
+    // Well-formed but NOT the registered address (typo of the real one — missing the "1").
+    private static final String INVALID_EMAIL = "najam@yopmail.com";
+    // Well-formed, valid domain, but no account exists for it.
+    private static final String UNREGISTERED_EMAIL = "johndoe@yopmail.com";
+    // Not a valid email format at all (double @).
+    private static final String MALFORMED_EMAIL = "abc@@gmail.com";
+    // Wrong password for VALID_EMAIL.
+    private static final String INVALID_PASSWORD = "zain321";
+    // Right characters as VALID_PASSWORD but wrong case ("z" vs "Z") — proves the password
+    // check is case-sensitive.
+    private static final String WRONG_CASE_PASSWORD = "zain@123";
 
     private void pauseBetweenSteps() {
         try {
@@ -65,6 +90,43 @@ public class SignInTest extends BaseTest {
     }
 
     /**
+     * Shared driver for every "this should be rejected" case. Navigates to Sign In, fills
+     * the two fields (null / "" => leave that field blank), taps Sign In, then asserts the
+     * app did NOT log in. A Sign In button that isn't even clickable (form blocking the
+     * submit) is an acceptable outcome here, not a failure — the assertion is purely
+     * "we never reached the home screen and we're still on Sign In".
+     */
+    private void assertSignInRejected(String email, String password, String scenario) {
+        logStep("STEP 1: Starting test - " + scenario);
+        SignInPage signInPage = navigateToSignInScreen();
+
+        logStep("STEP 2: Entering credentials");
+        Assert.assertTrue(signInPage.enterEmail(email), "Failed to enter email");
+        Assert.assertTrue(signInPage.enterPassword(password), "Failed to enter password");
+        pauseBetweenSteps();
+
+        logStep("STEP 3: Tapping Sign In");
+        boolean clicked = signInPage.clickSignInButton();
+        logStep("Sign In button " + (clicked
+                ? "clicked"
+                : "was not clickable — form blocked the submit (acceptable for this case)"));
+        pauseBetweenSteps();
+
+        logStep("STEP 4: Verifying the app rejected the attempt");
+        String error = signInPage.getVisibleErrorText();
+        if (error != null) {
+            logStep("Inline error shown: \"" + error + "\"");
+        }
+        Assert.assertTrue(signInPage.isSignInUnsuccessful(),
+                "App appears to have signed in despite invalid input (" + scenario + ")");
+        logStep("TEST PASSED: sign-in correctly rejected (" + scenario + ")");
+    }
+
+    // =====================================================================================
+    // Positive path
+    // =====================================================================================
+
+    /**
      * The Sign In screen is reachable from two entry points that lead to the exact same
      * screen: the Welcome screen's own "Sign In" button, and the Signup screen's "Sign In"
      * link. Rather than duplicating the credentials test per entry point, this data
@@ -79,6 +141,7 @@ public class SignInTest extends BaseTest {
         };
     }
 
+    /** Valid email + valid password -> successful login. */
     @Test(dataProvider = "signInEntryPoints")
     public void testSignInWithValidCredentials(boolean viaWelcomeScreen, String entryPointDescription) {
         logStep("STEP 1: Starting test - Sign in with valid credentials (" + entryPointDescription + ")");
@@ -97,6 +160,79 @@ public class SignInTest extends BaseTest {
         Assert.assertTrue(signInPage.isSignInSuccessful(), "Sign in did not succeed");
         logStep("TEST PASSED: Signed in successfully");
     }
+
+    // =====================================================================================
+    // Negative path - invalid credential combinations
+    // =====================================================================================
+
+    /** Invalid (unregistered/typo) email + valid password -> rejected. */
+    @Test
+    public void testSignInWithInvalidEmailAndValidPassword() {
+        assertSignInRejected(INVALID_EMAIL, VALID_PASSWORD, "invalid email + valid password");
+    }
+
+    /** Valid email + wrong password -> rejected. */
+    @Test
+    public void testSignInWithValidEmailAndInvalidPassword() {
+        assertSignInRejected(VALID_EMAIL, INVALID_PASSWORD, "valid email + invalid password");
+    }
+
+    /** Invalid email + wrong password -> rejected. */
+    @Test
+    public void testSignInWithInvalidEmailAndInvalidPassword() {
+        assertSignInRejected(INVALID_EMAIL, INVALID_PASSWORD, "invalid email + invalid password");
+    }
+
+    /** Well-formed but unregistered email + valid password -> rejected (no such account). */
+    @Test
+    public void testSignInWithUnregisteredEmail() {
+        assertSignInRejected(UNREGISTERED_EMAIL, VALID_PASSWORD, "unregistered email");
+    }
+
+    /**
+     * Password check must be case-sensitive: the exact characters of VALID_PASSWORD but
+     * with the wrong case ("zain@123" vs "Zain@123") must be rejected.
+     */
+    @Test
+    public void testSignInPasswordIsCaseSensitive() {
+        assertSignInRejected(VALID_EMAIL, WRONG_CASE_PASSWORD, "valid email + wrong-case password");
+    }
+
+    // =====================================================================================
+    // Negative path - empty fields
+    // =====================================================================================
+
+    /** Empty email + valid password -> rejected (email is mandatory). */
+    @Test
+    public void testSignInWithEmptyEmailAndValidPassword() {
+        assertSignInRejected("", VALID_PASSWORD, "empty email + valid password");
+    }
+
+    /** Valid email + empty password -> rejected (password is mandatory). */
+    @Test
+    public void testSignInWithValidEmailAndEmptyPassword() {
+        assertSignInRejected(VALID_EMAIL, "", "valid email + empty password");
+    }
+
+    /** Both fields empty -> rejected. */
+    @Test
+    public void testSignInWithBothFieldsEmpty() {
+        assertSignInRejected("", "", "email and password both empty");
+    }
+
+    // =====================================================================================
+    // Negative path - email format validation
+    // =====================================================================================
+
+    /** Malformed email format ("abc@@gmail.com") + valid password -> rejected. */
+    @Test
+    public void testSignInWithMalformedEmailFormat() {
+        assertSignInRejected(MALFORMED_EMAIL, VALID_PASSWORD, "malformed email format");
+    }
+
+    // =====================================================================================
+    // Password show/hide icon
+    // =====================================================================================
 
     @Test
     public void testPasswordShowHideToggle() {
@@ -122,6 +258,10 @@ public class SignInTest extends BaseTest {
 
         logStep("TEST PASSED: Password show/hide toggle works correctly");
     }
+
+    // =====================================================================================
+    // Forgot Password navigation
+    // =====================================================================================
 
     @Test
     public void testForgotPasswordNavigation() {
@@ -152,6 +292,10 @@ public class SignInTest extends BaseTest {
         Assert.assertTrue(signInPage.isSignInSuccessful(), "Sign in did not succeed after returning from Forgot Password");
         logStep("TEST PASSED: Forgot Password back button returns to Sign In, and Sign In still works correctly");
     }
+
+    // =====================================================================================
+    // Google sign-in
+    // =====================================================================================
 
     @Test
     public void testSignInWithGoogleFromWelcomeScreen() {

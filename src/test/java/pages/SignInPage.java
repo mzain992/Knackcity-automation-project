@@ -60,6 +60,26 @@ public class SignInPage {
     // account, so this anchors on the static line instead).
     private static final By SIGNIN_SUCCESS_MARKER = By.xpath("//android.widget.TextView[@text=\"Welcome to Knackcity!\"]");
 
+    // Best-effort locator for any inline validation / auth-failure text the Sign In screen
+    // shows on a rejected attempt. The app renders field errors as TextViews with a
+    // resource-id of "error-<field>" (same pattern confirmed on the Signup form, e.g.
+    // "error-email"), and auth failures as a short sentence containing words like
+    // "invalid", "incorrect", "match", "not found" or "required". This OR-matches those
+    // known shapes, lower-casing text for a case-insensitive compare. It is used ONLY to
+    // log *why* a negative test stayed on the screen — the pass/fail assertion for those
+    // tests is isSignInUnsuccessful() (still on Sign In, never reached home), which stays
+    // correct regardless of the exact error wording.
+    private static final String LOWER = "abcdefghijklmnopqrstuvwxyz";
+    private static final String UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private static final By SIGN_IN_ERROR_TEXT = By.xpath(
+            "//android.widget.TextView[starts-with(@resource-id,\"error-\")"
+                    + " or contains(translate(@text,\"" + UPPER + "\",\"" + LOWER + "\"),\"invalid\")"
+                    + " or contains(translate(@text,\"" + UPPER + "\",\"" + LOWER + "\"),\"incorrect\")"
+                    + " or contains(translate(@text,\"" + UPPER + "\",\"" + LOWER + "\"),\"match\")"
+                    + " or contains(translate(@text,\"" + UPPER + "\",\"" + LOWER + "\"),\"not found\")"
+                    + " or contains(translate(@text,\"" + UPPER + "\",\"" + LOWER + "\"),\"required\")"
+                    + " or contains(translate(@text,\"" + UPPER + "\",\"" + LOWER + "\"),\"does not exist\")]");
+
     private static final By CONTINUE_WITH_GOOGLE = By.xpath("//android.widget.TextView[@text=\"Continue with Google\"]");
     // Native Google account chooser. The row for each account is a
     // clickable LinearLayout[resource-id="container"], but the exact node this xpath
@@ -147,19 +167,39 @@ public class SignInPage {
         }
     }
 
+    /**
+     * Types {@code text} into a field. A null or empty {@code text} means "leave this
+     * field blank" — the field is still tapped and cleared, but sendKeys() is skipped.
+     * BUG FIX: previously always called sendKeys(text); with an empty string some
+     * UiAutomator2 builds throw ("String must not be empty"), which broke the
+     * empty-field validation tests before they could even reach the assertion.
+     */
     private boolean type(By locator, String text, String fieldName) {
         try {
             WebElement element = findClickableWithScroll(locator, fieldName);
             element.click();
             element.clear();
-            element.sendKeys(text);
+            if (text != null && !text.isEmpty()) {
+                element.sendKeys(text);
+            }
             hideKeyboardIfShown();
-            String masked = fieldName.toLowerCase().contains("password") ? "****" : text;
-            System.out.println("[SignInPage] Filled '" + fieldName + "' with '" + masked + "'");
+            boolean isPassword = fieldName.toLowerCase().contains("password");
+            String shown = text == null || text.isEmpty() ? "<empty>" : (isPassword ? "****" : text);
+            System.out.println("[SignInPage] Filled '" + fieldName + "' with '" + shown + "'");
             pauseForAction();
             return true;
         } catch (Exception e) {
             System.out.println("[SignInPage] Could not enter text into '" + fieldName + "': " + e.getMessage());
+            return false;
+        }
+    }
+
+    /** Quick presence check with a caller-chosen timeout (for negative-path assertions). */
+    private boolean isPresentWithin(By locator, Duration timeout) {
+        try {
+            new WebDriverWait(driver, timeout).until(ExpectedConditions.presenceOfElementLocated(locator));
+            return true;
+        } catch (Exception e) {
             return false;
         }
     }
@@ -247,8 +287,52 @@ public class SignInPage {
         return click(SIGN_IN_BUTTON, "clickSignInButton");
     }
 
+    /**
+     * True if the Sign In button is present and reports itself enabled. Some builds keep
+     * the button always-enabled and validate on tap instead, so a {@code false} here is
+     * meaningful ("clearly blocked") but a {@code true} is not a guarantee the tap will
+     * be accepted — the empty-field tests therefore also check isSignInUnsuccessful().
+     */
+    public boolean isSignInButtonEnabled() {
+        try {
+            return wait.until(ExpectedConditions.presenceOfElementLocated(SIGN_IN_BUTTON)).isEnabled();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Positive path: waits up to the full explicit timeout for the home screen to load. */
     public boolean isSignInSuccessful() {
         return isDisplayed(SIGNIN_SUCCESS_MARKER);
+    }
+
+    /**
+     * Negative path: the sign-in attempt did NOT succeed. True when the home
+     * "Welcome to Knackcity!" marker never appears within a short grace period AND we are
+     * still on the Sign In screen (Password field present). Shared by every
+     * invalid-credential / empty-field / bad-format test — it does not depend on the exact
+     * error message, only on the app refusing to navigate to the home screen.
+     */
+    public boolean isSignInUnsuccessful() {
+        if (isPresentWithin(SIGNIN_SUCCESS_MARKER, Duration.ofSeconds(6))) {
+            return false; // it actually logged in
+        }
+        return isPresentWithin(PASSWORD_FIELD, Duration.ofSeconds(3));
+    }
+
+    /**
+     * Best-effort read of any inline validation / auth-failure text currently on screen.
+     * Returns the message, or null if none matched. For logging/diagnostics only — see
+     * SIGN_IN_ERROR_TEXT.
+     */
+    public String getVisibleErrorText() {
+        try {
+            return new WebDriverWait(driver, Duration.ofSeconds(3))
+                    .until(ExpectedConditions.visibilityOfElementLocated(SIGN_IN_ERROR_TEXT))
+                    .getText();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ---------------- Google Sign In ----------------
