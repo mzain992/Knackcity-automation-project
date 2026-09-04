@@ -4,6 +4,7 @@ import io.appium.java_client.AppiumBy;
 import io.appium.java_client.android.AndroidDriver;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
@@ -117,9 +118,13 @@ public class SignupPage {
     private static final By BIO_FIELD = By.xpath("//android.widget.EditText[@text=\"Enter your bio\"]");
     private static final By LOCATION_FIELD = By.xpath("//android.widget.EditText[@text=\"Search your address\"]");
     private static final By LOCATION_DROPDOWN_SAN_FRANCISCO = By.xpath("//android.widget.TextView[@text=\"San Francisco, CA, USA\"]");
-    // NOTE: this build's placeholder is "Enter Phone Number" — confirmed on-device this
-    // changed from the earlier "123 456 7890" placeholder seen in a prior build.
-    private static final By PHONE_FIELD = By.xpath("//android.widget.EditText[@text=\"Enter Phone Number\"]");
+    // Phone field. The placeholder ("Enter Phone Number") only matches while the field is
+    // empty — it flips to the typed/formatted value on first keystroke, which broke the
+    // retry loop in enterPhoneNumber(). Anchor on the stable "Phone Number *" label via the
+    // following:: axis (same pattern used for Password), with the placeholder as a fallback.
+    private static final By PHONE_FIELD = By.xpath(
+            "//android.widget.TextView[@text=\"Phone Number *\"]/following::android.widget.EditText[1]"
+                    + " | //android.widget.EditText[@text=\"Enter Phone Number\"]");
     // BUG FIX: previously anchored on the password="true"/"false" attribute, but that
     // attribute is present on EVERY EditText (it's "false" on Full Name, Bio, Email —
     // not just actual password fields), so that filter matched *any* text field and
@@ -190,19 +195,34 @@ public class SignupPage {
     private static final By GOOGLE_ACCOUNT_OPTION = By.xpath(
             "//android.widget.TextView[@resource-id=\"com.google.android.gms:id/account_display_name\" and @text=\"Onyx Test Account\"]");
 
+    // Since the current build, tapping "Create Account" no longer finishes signup directly —
+    // it first sends an email OTP and shows the shared verification screen. All OTP handling
+    // is delegated to OtpVerificationPage (same screen the Forgot Password flow uses).
+    private final OtpVerificationPage otpPage;
+
     public SignupPage(AndroidDriver driver) {
         this.driver = driver;
         this.wait = new WebDriverWait(driver, EXPLICIT_WAIT);
+        this.otpPage = new OtpVerificationPage(driver);
     }
 
     // ---------------- Internal helpers ----------------
 
     private void pauseForAction() {
+        sleepQuietly(ACTION_WAIT.toMillis());
+    }
+
+    private void sleepQuietly(long millis) {
         try {
-            Thread.sleep(ACTION_WAIT.toMillis());
+            Thread.sleep(millis);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    /** Strips everything but digits — for comparing typed vs. displayed phone values. */
+    private static String digitsOnly(String value) {
+        return value == null ? "" : value.replaceAll("\\D", "");
     }
 
     private String maskIfSensitive(String fieldName, String value) {
@@ -593,16 +613,44 @@ public class SignupPage {
     }
 
     /**
-     * Verifies DOB is enforced as mandatory: leaves it untouched (empty) and confirms
-     * that submitting the form does NOT succeed — i.e. we're still on the signup screen
-     * afterward. Uses the signup screen's own presence as the check rather than a
-     * specific error-message locator, since no DOB-required error text/locator has been
-     * confirmed on-device yet.
+     * Verifies DOB is enforced as mandatory: leaves it untouched (empty), submits, and
+     * confirms the form did NOT advance. "Did not advance" is true when EITHER the
+     * DOB-required error is shown OR we're still on the signup form — and, definitively,
+     * we are NOT on the post-Create-Account OTP screen. (Checking the signup marker alone
+     * false-negatived: submitting scrolls the long form to the first error, moving both
+     * the Full Name field and the Create Account button out of view.)
      */
     public boolean isStillOnSignupScreenAfterEmptyDobSubmit() {
         clickCreateAccountButton();
         pauseForAction();
-        return isSignupScreenDisplayed();
+        scrollUp();
+        pauseForAction();
+        boolean dobError = isDobRequiredErrorDisplayed();
+        boolean onForm = isSignupScreenDisplayed();
+        System.out.println("[SignupPage] Empty-DOB submit — dobError=" + dobError + ", onSignupForm=" + onForm);
+        return dobError || onForm;
+    }
+
+    // Inline "date of birth is required" validation shown under the DOB field on an
+    // empty-DOB submit. The signup form renders field errors as TextViews with a
+    // resource-id of "error-<field>" (same pattern as "error-email"); the exact suffix
+    // isn't confirmed, so this also matches on the message text (case-insensitively),
+    // accepting the common "date of birth" / "DOB" / "birth ... required" wordings.
+    private static final By DOB_REQUIRED_ERROR = By.xpath(
+            "//android.widget.TextView[@resource-id=\"error-dob\" or @resource-id=\"error-dateOfBirth\""
+                    + " or @resource-id=\"error-date_of_birth\""
+                    + " or contains(translate(@text,\"DATEOFBIRTH\",\"dateofbirth\"),\"date of birth\")"
+                    + " or (contains(translate(@text,\"DOB\",\"dob\"),\"dob\")"
+                    + " and contains(translate(@text,\"REQUIRED\",\"required\"),\"required\"))"
+                    + " or (contains(translate(@text,\"BIRTH\",\"birth\"),\"birth\")"
+                    + " and contains(translate(@text,\"REQUIRED\",\"required\"),\"required\"))]");
+
+    /**
+     * True if a "date of birth is required" validation message is visible (call right
+     * after {@link #isStillOnSignupScreenAfterEmptyDobSubmit()}, which triggers it).
+     */
+    public boolean isDobRequiredErrorDisplayed() {
+        return isDisplayed(DOB_REQUIRED_ERROR);
     }
 
     public boolean clickGenderField() {
@@ -658,8 +706,81 @@ public class SignupPage {
         return click(LOCATION_DROPDOWN_SAN_FRANCISCO, "selectLocationFromDropdown");
     }
 
+    /**
+     * Enters the phone number robustly.
+     *
+     * <p>This build's phone field carries a country-code prefix and enforces "exactly 10
+     * digits", and its formatter fights automation input:
+     * <ul>
+     *   <li>a single fast {@code element.sendKeys("<10 digits>")} lands partially
+     *       ("8148014748" -> "731255"), and</li>
+     *   <li>{@code element.sendKeys(oneChar)} in a loop does a <i>replace</i> per call on
+     *       this UiAutomator2 build, so only the last digit survives ("...9").</li>
+     * </ul>
+     * So this types with the W3C Actions API (genuine key events to the focused field —
+     * these append), reads the field back, and escalates the strategy on retry until all
+     * ten digits stick.
+     */
     public boolean enterPhoneNumber(String phone) {
-        return type(PHONE_FIELD, phone, "Phone Number");
+        String wanted = digitsOnly(phone);
+        try {
+            for (int attempt = 1; attempt <= 4; attempt++) {
+                WebElement field = findClickableWithScroll(PHONE_FIELD, "Phone Number");
+                field.click();
+                field.clear();
+                sleepQuietly(300);
+
+                switch (attempt) {
+                    case 1:
+                        // Whole string as real key events.
+                        new Actions(driver).sendKeys(wanted).perform();
+                        break;
+                    case 2:
+                        // Key events one digit at a time, with a beat for the formatter.
+                        for (int i = 0; i < wanted.length(); i++) {
+                            new Actions(driver).sendKeys(String.valueOf(wanted.charAt(i))).perform();
+                            sleepQuietly(150);
+                        }
+                        break;
+                    case 3:
+                        // Appium IME "type" into the focused element.
+                        Map<String, Object> typeArgs = new HashMap<>();
+                        typeArgs.put("text", wanted);
+                        driver.executeScript("mobile: type", typeArgs);
+                        break;
+                    default:
+                        // Last resort — plain single sendKeys.
+                        field.sendKeys(wanted);
+                }
+                hideKeyboardIfShown();
+                sleepQuietly(300);
+
+                String actual = digitsOnly(readPhoneFieldText());
+                // endsWith() tolerates the leading country-code digit the field may prepend.
+                if (actual.endsWith(wanted)) {
+                    System.out.println("[SignupPage] Filled 'Phone Number' with '" + wanted
+                            + "' (strategy " + attempt + ")");
+                    pauseForAction();
+                    return true;
+                }
+                System.out.println("[SignupPage] Phone field held '" + actual + "' after strategy " + attempt
+                        + "/4 (wanted '" + wanted + "') — clearing and retrying");
+            }
+            System.out.println("[SignupPage] Phone number would not stick after 4 strategies");
+            return false;
+        } catch (Exception e) {
+            System.out.println("[SignupPage] Could not enter phone number: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /** Re-reads the phone field's current text, tolerant of it having scrolled/changed. */
+    private String readPhoneFieldText() {
+        try {
+            return driver.findElement(PHONE_FIELD).getText();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     public boolean enterPassword(String password) {
@@ -711,6 +832,40 @@ public class SignupPage {
 
     public boolean clickCreateAccountButton() {
         return click(CREATE_ACCOUNT_BUTTON, "clickCreateAccountButton");
+    }
+
+    /**
+     * Post-signup email-OTP verification screen (shown after "Create Account" since the
+     * current build). {@code true} once the signup either reached that screen OR went
+     * straight to the success screen (older behaviour / already-verified email).
+     */
+    public boolean isEmailOtpScreenDisplayed() {
+        return otpPage.isOtpScreenDisplayed();
+    }
+
+    /** Explicitly waits out the 60s cooldown for the "Resend OTP" option to appear. */
+    public boolean waitForResendOtpOption() {
+        return otpPage.waitForResendOtpOption();
+    }
+
+    /** True if the "Resend OTP" option is currently visible on the OTP screen. */
+    public boolean isResendOtpDisplayed() {
+        return otpPage.isResendOtpDisplayed();
+    }
+
+    /** Taps "Resend OTP" (only valid once the 60s cooldown has elapsed). */
+    public boolean clickResendOtp() {
+        return otpPage.clickResendOtp();
+    }
+
+    /** Polls the OTP field(s) until a manually-typed code appears (or {@code maxWait} elapses). */
+    public boolean waitForManualOtpEntry(int minDigits, Duration maxWait) {
+        return otpPage.waitForManualOtpEntry(minDigits, maxWait);
+    }
+
+    /** Taps "Verify Code" to submit the manually-entered OTP. */
+    public boolean clickVerifyCode() {
+        return otpPage.clickVerifyCode();
     }
 
     public boolean isSignupSuccessful() {

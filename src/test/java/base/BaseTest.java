@@ -46,6 +46,14 @@ public class BaseTest {
         // full 10s before returning, measured on-device. Disabling it drops each lookup
         // to ~0.2-0.5s and removes a major source of flaky/slow element waits app-wide.
         options.setCapability("appium:waitForIdleTimeout", 0);
+        // This device is slow to spin up the UiAutomator2 instrumentation on a cold start
+        // (seen intermittently: "The instrumentation process cannot be initialized within
+        // 30000ms timeout"). Give it more headroom, and let Appium reinstall the helper
+        // servers if a stale/broken copy is the cause.
+        options.setCapability("appium:uiautomator2ServerLaunchTimeout", 90000);
+        options.setCapability("appium:uiautomator2ServerInstallTimeout", 90000);
+        options.setCapability("appium:uiautomator2ServerReadTimeout", 90000);
+        options.setCapability("appium:enforceAppInstall", false);
         // autoWebview is intentionally NOT set here: it makes UiAutomator2 switch to a
         // WebView context immediately on session start, which fails with
         // "SessionNotCreatedException: No such context found" because this app launches

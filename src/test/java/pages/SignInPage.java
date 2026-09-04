@@ -377,7 +377,19 @@ public class SignInPage {
         if (isPresentWithin(SIGNIN_SUCCESS_MARKER, Duration.ofSeconds(6))) {
             return false; // it actually logged in
         }
-        return isPresentWithin(PASSWORD_FIELD, Duration.ofSeconds(3));
+        // Rejected. Confirm we're still on the Sign In screen — retry a few times to ride
+        // out the brief re-render right after the submit spinner, where the Password field
+        // can momentarily detach from the tree (this caused a spurious "signed in despite
+        // invalid input" failure). A visible inline error also confirms a rejected attempt.
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            if (isPresentWithin(PASSWORD_FIELD, Duration.ofSeconds(3))) {
+                return true;
+            }
+            if (getVisibleErrorText() != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

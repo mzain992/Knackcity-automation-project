@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
-<suite name="KnackcityAppiumSuite" verbose="1">
+<!--
+    Strictly sequential: there is exactly ONE physical device and ONE Appium session,
+    so nothing here may run in parallel. parallel="none" + the thread counts below pin
+    every test method AND every data-provider row to a single thread; two concurrent
+    @BeforeMethod driver creations against one device fail with SessionNotCreatedException.
+-->
+<suite name="KnackcityAppiumSuite" verbose="1"
+       parallel="none" thread-count="1" data-provider-thread-count="1">
     <test name="OnboardingTests">
         <classes>
             <class name="tests.OnboardingTest">

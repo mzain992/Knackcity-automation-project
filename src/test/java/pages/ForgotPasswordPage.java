@@ -34,9 +34,6 @@ public class ForgotPasswordPage {
     private static final Duration EXPLICIT_WAIT = Duration.ofSeconds(15);
     private static final Duration ACTION_WAIT = Duration.ofSeconds(2);
     private static final Duration SHORT_WAIT = Duration.ofSeconds(3);
-    // The OTP "Resend" link only becomes available after a fixed 60s server-side cooldown.
-    // We wait for it explicitly (not with a blind sleep) with a small buffer on top of 60s.
-    private static final Duration RESEND_OTP_WAIT = Duration.ofSeconds(90);
     private static final int MAX_SCROLL_ATTEMPTS = 3;
 
     // Lower/upper alphabets for case-insensitive translate() comparisons in XPath.
@@ -45,6 +42,9 @@ public class ForgotPasswordPage {
 
     private final AndroidDriver driver;
     private final WebDriverWait wait;
+    // The OTP screen is identical to the one signup uses — delegate all OTP handling to the
+    // shared page object rather than keeping a second copy here.
+    private final OtpVerificationPage otpPage;
 
     // ---------------- Locators ----------------
 
@@ -56,15 +56,7 @@ public class ForgotPasswordPage {
     private static final By SEND_VERIFICATION_CODE_BUTTON =
             By.xpath("//android.view.ViewGroup[@content-desc=\"Send Verification Code\"]");
 
-    // OTP verification screen.
-    private static final By VERIFY_CODE_BUTTON =
-            By.xpath("//android.view.ViewGroup[@content-desc=\"Verify Code\"]");
-    private static final By RESEND_OTP_LINK =
-            By.xpath("//android.widget.TextView[@text=\"Resend OTP\"]");
-    // Best-effort handle on the OTP input so we can wait for the manually-typed code
-    // instead of blindly sleeping. Many OTP UIs split the code across several boxes; this
-    // matches the first editable field on the screen and any additional ones.
-    private static final By OTP_INPUT_FIELDS = By.xpath("//android.widget.EditText");
+    // OTP verification screen — locators/handling live in the shared OtpVerificationPage.
     // Success confirmation after Verify Code. Matched leniently (case-insensitive,
     // substring) so minor copy changes ("Email Verified successfully" vs
     // "Email verified successfully.") don't break the assertion.
@@ -121,6 +113,7 @@ public class ForgotPasswordPage {
     public ForgotPasswordPage(AndroidDriver driver) {
         this.driver = driver;
         this.wait = new WebDriverWait(driver, EXPLICIT_WAIT);
+        this.otpPage = new OtpVerificationPage(driver);
     }
 
     // ---------------- Internal helpers (same style as SignInPage) ----------------
@@ -269,91 +262,36 @@ public class ForgotPasswordPage {
         return click(SEND_VERIFICATION_CODE_BUTTON, "clickSendVerificationCode");
     }
 
-    // ================= Step: OTP verification screen =================
+    // ================= Step: OTP verification screen (delegated to OtpVerificationPage) =================
 
     /** The OTP screen is identified by its "Verify Code" button. */
     public boolean isOtpScreenDisplayed() {
-        return isDisplayed(VERIFY_CODE_BUTTON);
+        return otpPage.isOtpScreenDisplayed();
     }
 
-    /**
-     * Explicitly waits out the 60s OTP cooldown by waiting for the "Resend OTP" option to
-     * appear (up to {@link #RESEND_OTP_WAIT}). Preferred over a hard-coded 60s sleep.
-     *
-     * @return true if "Resend OTP" became available in time.
-     */
+    /** Explicitly waits out the 60s cooldown for the "Resend OTP" option to appear. */
     public boolean waitForResendOtpOption() {
-        System.out.println("[ForgotPasswordPage] Waiting up to " + RESEND_OTP_WAIT.getSeconds()
-                + "s for the 'Resend OTP' option (60s server cooldown)...");
-        return isPresentWithin(RESEND_OTP_LINK, RESEND_OTP_WAIT);
+        return otpPage.waitForResendOtpOption();
     }
 
     /** True if the "Resend OTP" option is currently visible. */
     public boolean isResendOtpDisplayed() {
-        return isDisplayed(RESEND_OTP_LINK);
+        return otpPage.isResendOtpDisplayed();
     }
 
     /** Taps "Resend OTP" (only valid once the cooldown has elapsed). */
     public boolean clickResendOtp() {
-        return click(RESEND_OTP_LINK, "clickResendOtp");
+        return otpPage.clickResendOtp();
     }
 
-    /**
-     * Gives a human time to read the email and type the OTP directly on the device.
-     * Rather than a fixed sleep, this polls the OTP field(s) and returns as soon as a code
-     * of at least {@code minDigits} digits has been entered, or when {@code maxWait}
-     * elapses (whichever comes first).
-     *
-     * @return true if an OTP of the expected length was detected before the timeout.
-     */
+    /** Polls the OTP field(s) until a manually-typed code appears (or {@code maxWait} elapses). */
     public boolean waitForManualOtpEntry(int minDigits, Duration maxWait) {
-        System.out.println("======================================================================");
-        System.out.println("  ACTION REQUIRED: enter the OTP for the recovery email ON THE DEVICE.");
-        System.out.println("  Waiting up to " + maxWait.getSeconds() + "s for a " + minDigits
-                + "+ digit code to be entered...");
-        System.out.println("======================================================================");
-        long deadline = System.currentTimeMillis() + maxWait.toMillis();
-        while (System.currentTimeMillis() < deadline) {
-            if (currentOtpDigitCount() >= minDigits) {
-                System.out.println("[ForgotPasswordPage] Detected a " + minDigits + "+ digit OTP — continuing.");
-                return true;
-            }
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
-        System.out.println("[ForgotPasswordPage] Timed out waiting for a manual OTP — continuing anyway "
-                + "(Verify Code will fail if no code was entered).");
-        return false;
-    }
-
-    /** Sums the digits currently held across all OTP EditTexts on screen (best-effort). */
-    private int currentOtpDigitCount() {
-        int digits = 0;
-        try {
-            for (WebElement field : driver.findElements(OTP_INPUT_FIELDS)) {
-                String value = field.getText();
-                if (value == null) {
-                    continue;
-                }
-                for (int i = 0; i < value.length(); i++) {
-                    if (Character.isDigit(value.charAt(i))) {
-                        digits++;
-                    }
-                }
-            }
-        } catch (Exception ignored) {
-            // Screen changed / stale — treat as "nothing entered yet".
-        }
-        return digits;
+        return otpPage.waitForManualOtpEntry(minDigits, maxWait);
     }
 
     /** Taps "Verify Code" to submit the entered OTP. */
     public boolean clickVerifyCode() {
-        return click(VERIFY_CODE_BUTTON, "clickVerifyCode");
+        return otpPage.clickVerifyCode();
     }
 
     /**

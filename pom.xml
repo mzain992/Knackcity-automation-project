@@ -89,6 +89,14 @@
                     <suiteXmlFiles>
                         <suiteXmlFile>testng.xml</suiteXmlFile>
                     </suiteXmlFiles>
+                    <!--
+                        One device / one Appium session => never fork the run. forkCount=1
+                        + reuseForks keeps everything in a single JVM; Surefire's own
+                        parallelism is left off (unset) so the testng.xml parallel="none"
+                        settings are authoritative.
+                    -->
+                    <forkCount>1</forkCount>
+                    <reuseForks>true</reuseForks>
                 </configuration>
             </plugin>
         </plugins>

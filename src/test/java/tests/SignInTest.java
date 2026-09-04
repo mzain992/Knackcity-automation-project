@@ -379,3 +379,4 @@ public class SignInTest extends BaseTest {
         log("Signed in successfully with Google");
     }
 }
+
