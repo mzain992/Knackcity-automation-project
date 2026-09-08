@@ -146,9 +146,11 @@ public class OnboardingTest extends BaseTest {
         Assert.assertTrue(signupPage.isSignupScreenDisplayed(),
                 "Signup screen was not displayed after onboarding");
 
-        logStep("STEP 3: Uploading profile image (optional)");
-        boolean imageUploaded = signupPage.uploadFirstAvailablePhotoFromGallery();
-        logStep("Profile image upload " + (imageUploaded ? "succeeded" : "was skipped/failed (optional field, continuing)"));
+        logStep("STEP 3: Profile image via GALLERY — upload, view, delete (Cancel then Delete), re-upload");
+        boolean imageUploaded = signupPage.completeGalleryImageUploadFlow();
+        logStep("Gallery profile-image flow " + (imageUploaded
+                ? "succeeded (image set)"
+                : "did not leave an image set (optional field — continuing)"));
         pauseBetweenSteps();
 
         // Screen name, email and phone must be unique per run — the app rejects duplicates,
@@ -227,10 +229,10 @@ public class OnboardingTest extends BaseTest {
         Assert.assertTrue(signupPage.isSignupScreenDisplayed(),
                 "Signup screen was not displayed after onboarding");
 
-        logStep("STEP 3: Uploading profile image via in-app camera (capture -> close via Navigate up -> "
-                + "capture again -> Crop to select)");
-        Assert.assertTrue(signupPage.uploadPhotoFromCamera(),
-                "Failed to capture and select a profile image via the in-app camera");
+        logStep("STEP 3: Profile image via CAMERA — capture+cancel edit, capture+Crop, view, "
+                + "delete (Cancel then Delete), capture+Crop again");
+        Assert.assertTrue(signupPage.completeCameraImageUploadFlow(),
+                "Camera profile-image flow did not leave an image set");
         pauseBetweenSteps();
 
         // Screen name, email AND phone must all be unique per run — the app rejects
