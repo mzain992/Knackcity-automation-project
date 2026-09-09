@@ -48,7 +48,7 @@ public class ForgotPasswordTest extends BaseTest {
      * Use a value that has not been used for {@link #RECOVERY_EMAIL} yet, and update this
      * when re-running. Override without editing via {@code -DforgotNewPassword=...}.
      */
-    private static final String NEW_PASSWORD = System.getProperty("forgotNewPassword", "Onyx@1234");
+    private static final String NEW_PASSWORD = System.getProperty("forgotNewPassword", "Onyx@12345");
     /** Deliberately-wrong confirm value used to trigger the mismatch validation. */
     private static final String MISMATCHED_CONFIRM_PASSWORD = "Xani123";
     /** Minimum digits that count as a complete OTP (adjust if the app uses a longer code). */
