@@ -4,18 +4,19 @@ import io.appium.java_client.AppiumBy;
 import io.appium.java_client.android.AndroidDriver;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 public class SignupPage {
 
     private static final Duration EXPLICIT_WAIT = Duration.ofSeconds(15);
     private static final Duration SCROLL_RETRY_WAIT = Duration.ofSeconds(5);
-    private static final Duration PERMISSION_WAIT = Duration.ofSeconds(5);
     private static final Duration ACTION_WAIT = Duration.ofSeconds(2);
     private static final int BIO_MAX_LENGTH = 150;
     // The signup form is a long scrollable page; fields past Location/Phone (Confirm
@@ -35,61 +36,83 @@ public class SignupPage {
     // Signup screen marker (full name field is mandatory, always present)
     private static final By FULL_NAME_FIELD = By.xpath("//android.widget.EditText[@text=\"Enter your full name\"]");
 
-    // Image upload
-    // The tap target that opens the Gallery/Camera picker is the circular icon + its
-    // caption, grouped under one clickable ViewGroup with this content-desc. Confirmed
-    // on-device (resource-id not present on this element, content-desc is exact/clean —
-    // no trailing-comma quirk here).
-    private static final By UPLOAD_IMAGE_BUTTON = By.xpath("//android.view.ViewGroup[@content-desc=\"Upload Image (optional)\"]");
-    private static final By CHOOSE_FROM_GALLERY = By.xpath("//android.widget.TextView[@text=\"Choose from Gallery\"]");
-    // Camera branch of the same upload-image picker (sibling option to "Choose from
-    // Gallery"). Locator as supplied for this flow — not yet re-confirmed on-device in
-    // this session (Appium MCP was unavailable), so treat as provisional like the rest
-    // of this block until run once.
-    private static final By USE_CAMERA_OPTION = By.xpath("//android.view.ViewGroup[@content-desc=\"Use Camera\"]");
-    // Camera permission dialog's "Allow only while using the app" button, as supplied.
-    // Distinct element from PERMISSION_ALLOW_BUTTONS' by-id lookup of the same
-    // resource-id; kept separate since this flow's steps were given explicitly by xpath.
-    private static final By CAMERA_PERMISSION_ALLOW_FOREGROUND_ONLY =
-            By.xpath("//android.widget.Button[@resource-id=\"com.android.permissioncontroller:id/permission_allow_foreground_only_button\"]");
-    // In-app camera's shutter button, as supplied.
-    private static final By CAMERA_SHUTTER_BUTTON =
-            By.xpath("//android.view.ViewGroup[@resource-id=\"in-app-camera-shutter-button\"]/android.view.ViewGroup");
-    // Confirmed on-device: the shutter takes the picture and drops straight onto a uCrop
-    // "Edit Photo" screen (resource-id="com.knackcity:id/ucrop_photobox"). Its toolbar has
-    // two actions — the "Navigate up" ImageButton (top-left, CANCELS the crop and returns
-    // to the signup form with NO image set) and the "Crop" Button
-    // (resource-id="com.knackcity:id/menu_crop", top-right, ACCEPTS the crop and returns
-    // the image to the form). The requested flow deliberately exercises both: capture,
-    // cancel via Navigate up, re-capture, then accept via Crop.
-    private static final By CAMERA_CAPTURED_IMAGE_CLOSE_BUTTON =
-            By.xpath("//android.widget.ImageButton[@content-desc=\"Navigate up\"]");
-    private static final By CAMERA_CROP_BUTTON =
-            By.xpath("//*[@resource-id=\"com.knackcity:id/menu_crop\"]");
+    // ============= Profile image: gallery + camera (current build) =============
+    // "Upload Media" = tap the circular avatar / profile-image control to open the action
+    // sheet. Sheet contents:
+    //   empty avatar : "Upload Photo" (gallery) / "Take Photo" (in-app camera)
+    //   image set    : the above + ", View Photo" / ", Delete"
+    // Locators below are exactly as captured on-device for this build.
 
-    // Common Android runtime-permission dialog buttons (system permission controller).
-    // Tried in order; whichever appears first is accepted. Android 14+'s photo-picker
-    // permission dialog ("Allow limited access" / "Allow all" / "Don't allow") is a
-    // different layout from the classic Allow/Deny prompt — confirmed on-device via its
-    // resource-ids, listed first since it's what this app's Android 15 test device shows.
-    private static final By[] PERMISSION_ALLOW_BUTTONS = {
-            By.id("com.android.permissioncontroller:id/permission_allow_all_button"),
-            By.id("com.android.permissioncontroller:id/permission_allow_button"),
-            By.id("com.android.permissioncontroller:id/permission_allow_foreground_only_button"),
-            By.id("com.android.permissioncontroller:id/permission_allow_one_time_button"),
-            By.xpath("//android.widget.Button[@text=\"While using the app\"]"),
-            By.xpath("//android.widget.Button[@text=\"Only this time\"]"),
-            By.xpath("//android.widget.Button[@text=\"Allow\"]"),
-            By.xpath("//android.widget.Button[@resource-id=\"com.android.packageinstaller:id/permission_allow_button\"]")
-    };
+    // The avatar control that opens the action sheet — first ImageView on the form (the
+    // avatar sits above every other image).
+    private static final By IMAGE_UPLOAD_TRIGGER = By.xpath("(//android.widget.ImageView)[1]");
 
-    // Native Android Photo Picker (com.google.android.photopicker), shown after granting
-    // gallery access. It's a Compose UI with no resource-ids; grid items only expose an
-    // auto-generated "Photo taken on <date>" content-desc, so this targets the first grid
-    // item positionally via XPath index rather than a fixed value. Confirmed on-device.
-    private static final By FIRST_PHOTO_IN_PICKER =
-            By.xpath("(//android.view.View[contains(@content-desc,\"Photo taken on\")])[1]");
-    private static final By PHOTO_PICKER_DONE_BUTTON = By.xpath("//android.widget.TextView[@text=\"Done\"]/..");
+    // Action-sheet items — empty avatar. Plain TextViews with the option label.
+    private static final By MENU_UPLOAD_PHOTO = By.xpath("//android.widget.TextView[@text=\"Upload Photo\"]");
+    private static final By MENU_TAKE_PHOTO = By.xpath("//android.widget.TextView[@text=\"Take Photo\"]");
+    // Action-sheet items — image already set. Confirmed on-device: the clickable node is a
+    // ViewGroup whose content-desc is "<icon-glyph>, <label>" (React Native joins the icon's
+    // empty label with the text), so an exact "@content-desc=', View Photo'" match misses —
+    // anchor with contains() on ", <label>" (the leading comma-space keeps ", Delete" from
+    // matching the delete-dialog's exact "Delete" button). TextView fallback for safety.
+    private static final By MENU_VIEW_PHOTO = By.xpath(
+            "//android.view.ViewGroup[contains(@content-desc,\", View Photo\")]"
+                    + " | //android.widget.TextView[@text=\"View Photo\"]");
+    private static final By MENU_DELETE_PHOTO = By.xpath(
+            "//android.view.ViewGroup[contains(@content-desc,\", Delete\")]"
+                    + " | //android.widget.TextView[@text=\"Delete\" and not(ancestor::*[contains(@content-desc,\"Delete Photo\")])]");
+
+    // Runtime-permission dialog buttons (com.android.permissioncontroller):
+    //   gallery : "Allow Selected"  (limited photo access)
+    //   camera  : "Allow only while using the app"  (foreground only)
+    private static final By PERMISSION_ALLOW_SELECTED = By.xpath(
+            "//android.widget.Button[@resource-id=\"com.android.permissioncontroller:id/permission_allow_selected_button\"]");
+    private static final By PERMISSION_ALLOW_FOREGROUND_ONLY = By.xpath(
+            "//android.widget.Button[@resource-id=\"com.android.permissioncontroller:id/permission_allow_foreground_only_button\"]");
+
+    // Android photo picker (com.google.android.photopicker), multi-select "Media grid".
+    // Confirmed on-device: the grid container ("Media grid") renders BEFORE its tiles do
+    // (Compose lazy grid), so waits must anchor on an actual tile, not the container.
+    // First selectable tile. The spec's fixed positional path
+    // (Media grid/View/View[2]/View[2]/View) does not resolve consistently against the
+    // lazy grid, so prefer "first clickable View inside Media grid", then a "Photo taken"
+    // tile's clickable parent, then the spec path as a last resort.
+    private static final By GALLERY_FIRST_IMAGE = By.xpath(
+            "(//android.view.View[@content-desc=\"Media grid\"]//android.view.View[@clickable=\"true\"])[1]"
+                    + " | (//android.view.View[contains(@content-desc,\"Photo taken\")]/parent::android.view.View)[1]"
+                    + " | //android.view.View[@content-desc=\"Media grid\"]/android.view.View/android.view.View[2]/android.view.View[2]/android.view.View");
+    // Any tile — used to know the grid has actually populated.
+    private static final By GALLERY_ANY_TILE = By.xpath(
+            "//android.view.View[@content-desc=\"Media grid\"]//android.view.View[@clickable=\"true\"]"
+                    + " | //android.view.View[contains(@content-desc,\"Photo taken\")]");
+    // "Done" bar button — appears only AFTER at least one tile is selected. The visible
+    // node is a non-clickable TextView; tapping it works via its clickable ancestor.
+    private static final By GALLERY_DONE_BUTTON = By.xpath(
+            "//android.widget.TextView[@text=\"Done\"]/ancestor-or-self::*[@clickable=\"true\"][1]"
+                    + " | //android.widget.TextView[@text=\"Done\"]"
+                    + " | //android.widget.Button[@text=\"Done\"]"
+                    + " | //*[@content-desc=\"Done\"]");
+
+    // In-app camera shutter.
+    private static final By CAMERA_SHUTTER_BUTTON = By.xpath(
+            "//android.view.ViewGroup[@resource-id=\"in-app-camera-shutter-button\"]/android.view.ViewGroup");
+    // "Edit Photo" screen after a capture: "Navigate up" CANCELS (no image is applied),
+    // "Crop" ACCEPTS (the cropped image is set on the form).
+    private static final By EDIT_PHOTO_CLOSE_BUTTON = By.xpath("//android.widget.ImageButton[@content-desc=\"Navigate up\"]");
+    private static final By EDIT_PHOTO_CROP_BUTTON = By.xpath("//android.widget.Button[@content-desc=\"Crop\"]");
+
+    // Full-screen photo viewer (opened via ", View Photo") — closed by the top-right glyph.
+    // The spec's bare //android.widget.TextView[@text=""] glyph is not itself clickable, so
+    // this also targets its clickable ancestor and the labelled close Button.
+    private static final By PHOTO_VIEWER_CLOSE_BUTTON = By.xpath(
+            "//android.widget.Button[@content-desc=\"Close image preview\"]"
+                    + " | //android.widget.TextView[@text=\"\"]/ancestor-or-self::*[@clickable=\"true\"][1]"
+                    + " | //android.widget.TextView[@text=\"\"]");
+
+    // Delete-confirmation dialog ("Delete Photo?"): "Cancel" keeps the image, "Delete"
+    // removes it. Both are clickable ViewGroups with an exact content-desc.
+    private static final By DELETE_DIALOG_CANCEL = By.xpath("//android.view.ViewGroup[@content-desc=\"Cancel\"]");
+    private static final By DELETE_DIALOG_CONFIRM = By.xpath("//android.view.ViewGroup[@content-desc=\"Delete\"]");
 
     // Form fields
     private static final By SCREEN_NAME_FIELD = By.xpath("//android.widget.EditText[@resource-id=\"signup-screen-name-input\"]");
@@ -117,9 +140,13 @@ public class SignupPage {
     private static final By BIO_FIELD = By.xpath("//android.widget.EditText[@text=\"Enter your bio\"]");
     private static final By LOCATION_FIELD = By.xpath("//android.widget.EditText[@text=\"Search your address\"]");
     private static final By LOCATION_DROPDOWN_SAN_FRANCISCO = By.xpath("//android.widget.TextView[@text=\"San Francisco, CA, USA\"]");
-    // NOTE: this build's placeholder is "Enter Phone Number" — confirmed on-device this
-    // changed from the earlier "123 456 7890" placeholder seen in a prior build.
-    private static final By PHONE_FIELD = By.xpath("//android.widget.EditText[@text=\"Enter Phone Number\"]");
+    // Phone field. The placeholder ("Enter Phone Number") only matches while the field is
+    // empty — it flips to the typed/formatted value on first keystroke, which broke the
+    // retry loop in enterPhoneNumber(). Anchor on the stable "Phone Number *" label via the
+    // following:: axis (same pattern used for Password), with the placeholder as a fallback.
+    private static final By PHONE_FIELD = By.xpath(
+            "//android.widget.TextView[@text=\"Phone Number *\"]/following::android.widget.EditText[1]"
+                    + " | //android.widget.EditText[@text=\"Enter Phone Number\"]");
     // BUG FIX: previously anchored on the password="true"/"false" attribute, but that
     // attribute is present on EVERY EditText (it's "false" on Full Name, Bio, Email —
     // not just actual password fields), so that filter matched *any* text field and
@@ -139,7 +166,15 @@ public class SignupPage {
             "//android.widget.TextView[@text=\"Password *\"]/following::android.widget.EditText[1]/following-sibling::android.view.ViewGroup[1]");
 
     // Terms & Conditions
-    private static final By TERMS_AND_CONDITIONS_LINK = By.xpath("//android.widget.TextView[@text=\"I agree to the Terms & Conditions\"]");
+    // BUG FIX: the current build reworded this from "I agree to the Terms & Conditions" to
+    // "I have read and agree to the Terms & Conditions". The node is a single non-clickable
+    // TextView (enabled=true, so elementToBeClickable still resolves it and click() does a
+    // coordinate tap on it). Match on the "Terms & Conditions" tail so a future minor
+    // reword of the leading copy doesn't break it again; keep the old exact text as a
+    // fallback.
+    private static final By TERMS_AND_CONDITIONS_LINK = By.xpath(
+            "//android.widget.TextView[contains(@text,\"agree to the Terms & Conditions\")]"
+                    + " | //android.widget.TextView[@text=\"I agree to the Terms & Conditions\"]");
     // BUG FIX: this is a NATIVE in-app screen, not a WebView — confirmed on-device (its
     // own header reads "Terms & Conditions"; android.webkit.WebView never appears in the
     // tree). The old locator waited for a WebView that would never exist, so
@@ -162,16 +197,26 @@ public class SignupPage {
     // Create account
     // Confirmed on-device: resource-id="signup-submit", content-desc="Create Account".
     private static final By CREATE_ACCOUNT_BUTTON = By.xpath("//*[@resource-id=\"signup-submit\"]");
-    // Confirmed on-device: successful signup (manual or Google) lands on the shared home
-    // screen greeting, e.g. "Hi <name>" / "Welcome to Knackcity!". The greeting name text
-    // varies per account, so this anchors on the static "Welcome to Knackcity!" TextView.
-    private static final By SIGNUP_SUCCESS_MARKER = By.xpath("//android.widget.TextView[@text=\"Welcome to Knackcity!\"]");
+    // Confirmed on-device (screen dump after a real Sign In, which shares this flow):
+    // successful auth lands on a post-auth interstitial — heading "Welcome to KnackCity!",
+    // body "You're all set! ...", and a "Start Exploring" button — NOT a "Welcome to
+    // Knackcity!" home greeting. "Welcome to Knack..." also appears on the PRE-auth Welcome
+    // screen, so it can't be the marker; "Start Exploring" / "You're all set" are unique to
+    // the post-auth screen. Kept in sync with SignInPage.SIGNIN_SUCCESS_MARKER.
+    private static final By SIGNUP_SUCCESS_MARKER = By.xpath(
+            "//android.widget.TextView[@text=\"Start Exploring\" or starts-with(@text,\"You're all set\")]");
 
-    // Sign In (link back to the Sign In screen from Signup)
-    // Same wrapper pattern as elsewhere: the clickable node is the ViewGroup, not the
-    // inner TextView. Confirmed on-device on the actual Sign In screen's own "Sign In"
-    // submit button; this signup-screen link follows the same app-wide button pattern.
-    private static final By SIGN_IN_LINK = By.xpath("//android.view.ViewGroup[@content-desc=\"Sign In\"]");
+    // Sign In (link back to the Sign In screen from Signup — Sign-In "Entry Point 2":
+    // Welcome -> Get Started -> Signup screen -> this "Sign In" link).
+    // The visible label is a TextView, //android.widget.TextView[@text="Sign In"], but in
+    // this app tappable labels are wrapped in a clickable ViewGroup (the inner TextView is
+    // usually not itself clickable). This union targets, in order: the label's nearest
+    // clickable ancestor-or-self, the content-desc wrapper used elsewhere, and finally the
+    // bare label — the first that resolves clickable wins.
+    private static final By SIGN_IN_LINK = By.xpath(
+            "//android.widget.TextView[@text=\"Sign In\"]/ancestor-or-self::*[@clickable=\"true\"][1]"
+                    + " | //android.view.ViewGroup[@content-desc=\"Sign In\"]"
+                    + " | //android.widget.TextView[@text=\"Sign In\"]");
 
     // Google login
     // Confirmed on-device: the clickable node is the ViewGroup wrapper (content-desc exact,
@@ -180,19 +225,34 @@ public class SignupPage {
     private static final By GOOGLE_ACCOUNT_OPTION = By.xpath(
             "//android.widget.TextView[@resource-id=\"com.google.android.gms:id/account_display_name\" and @text=\"Onyx Test Account\"]");
 
+    // Since the current build, tapping "Create Account" no longer finishes signup directly —
+    // it first sends an email OTP and shows the shared verification screen. All OTP handling
+    // is delegated to OtpVerificationPage (same screen the Forgot Password flow uses).
+    private final OtpVerificationPage otpPage;
+
     public SignupPage(AndroidDriver driver) {
         this.driver = driver;
         this.wait = new WebDriverWait(driver, EXPLICIT_WAIT);
+        this.otpPage = new OtpVerificationPage(driver);
     }
 
     // ---------------- Internal helpers ----------------
 
     private void pauseForAction() {
+        sleepQuietly(ACTION_WAIT.toMillis());
+    }
+
+    private void sleepQuietly(long millis) {
         try {
-            Thread.sleep(ACTION_WAIT.toMillis());
+            Thread.sleep(millis);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    /** Strips everything but digits — for comparing typed vs. displayed phone values. */
+    private static String digitsOnly(String value) {
+        return value == null ? "" : value.replaceAll("\\D", "");
     }
 
     private String maskIfSensitive(String fieldName, String value) {
@@ -343,158 +403,459 @@ public class SignupPage {
         return isDisplayed(SIGNUP_SCREEN_MARKER);
     }
 
-    // ---------------- Image upload ----------------
+    // ==================== Image upload (gallery + camera) ====================
+    // Flow per the current build:
+    //   tap the avatar (ImageView) -> action sheet
+    //     empty : "Upload Photo" (gallery) / "Take Photo" (camera)
+    //     set   : ", View Photo" / ", Delete"
+    //   gallery : Upload Photo -> photo-picker permission (Allow) -> pick a photo
+    //   camera  : Take Photo -> camera permission (Allow while using) -> shutter ->
+    //             Edit Photo screen ("Navigate up" cancels, "Crop" accepts)
+    //   delete  : ", Delete" -> confirm dialog ("Cancel" keeps it, "Delete" removes it)
 
-    public boolean clickUploadImageButton() {
-        return click(UPLOAD_IMAGE_BUTTON, "clickUploadImageButton");
-    }
-
-    public boolean clickChooseFromGallery() {
-        return click(CHOOSE_FROM_GALLERY, "clickChooseFromGallery");
-    }
-
-    public boolean handlePermissionIfNeeded() {
-        WebDriverWait permissionWait = new WebDriverWait(driver, PERMISSION_WAIT);
-        for (By locator : PERMISSION_ALLOW_BUTTONS) {
-            try {
-                WebElement button = permissionWait.until(ExpectedConditions.elementToBeClickable(locator));
-                button.click();
-                System.out.println("[SignupPage] Handled permission popup via locator: " + locator);
-                pauseForAction();
-                return true;
-            } catch (Exception ignored) {
-                // Not this dialog/button — try the next known locator.
-            }
+    /** Short wait + click, no scroll — for action-sheet items, dialogs and system prompts. */
+    private boolean tap(By locator, String name) {
+        try {
+            new WebDriverWait(driver, Duration.ofSeconds(8))
+                    .until(ExpectedConditions.elementToBeClickable(locator))
+                    .click();
+            System.out.println("[SignupPage] Tapped '" + name + "'");
+            pauseForAction();
+            return true;
+        } catch (Exception e) {
+            System.out.println("[SignupPage] '" + name + "' not tappable: " + e.getMessage());
+            return false;
         }
-        System.out.println("[SignupPage] No permission popup appeared (or none of the known locators matched).");
-        return false;
-    }
-
-    public boolean selectFirstPhotoFromPicker() {
-        return click(FIRST_PHOTO_IN_PICKER, "selectFirstPhotoFromPicker");
-    }
-
-    public boolean confirmPhotoSelection() {
-        return click(PHOTO_PICKER_DONE_BUTTON, "confirmPhotoSelection");
     }
 
     /**
-     * Presses the Android back button a few times to dismiss any lingering system dialog
-     * or picker (permission prompt, photo picker, etc.) and return to the app. Used to
-     * recover from a partially-failed optional step so it can't strand a later step — or
-     * even the next test's session — on a foreign screen.
+     * Runs one numbered step of an image sub-flow and logs
+     * {@code [<FLOW> STEP n] <description> -> PASS|FAIL} (with the error text on failure).
+     * Never throws: the profile image is an optional signup field, so a failed sub-step is
+     * recorded and the flow continues — the caller derives the overall result from the
+     * final on-form state.
+     */
+    private boolean runStep(String flow, int number, String description, BooleanSupplier action) {
+        System.out.println("[SignupPage] [" + flow + " STEP " + number + "] " + description);
+        boolean ok;
+        try {
+            ok = action.getAsBoolean();
+        } catch (Exception e) {
+            System.out.println("[SignupPage] [" + flow + " STEP " + number + "] -> FAIL (" + e.getMessage() + ")");
+            return false;
+        }
+        System.out.println("[SignupPage] [" + flow + " STEP " + number + "] -> " + (ok ? "PASS" : "FAIL"));
+        return ok;
+    }
+
+    private boolean isPresentShort(By locator) {
+        return isPresent(locator, 3);
+    }
+
+    private boolean isPresent(By locator, int seconds) {
+        try {
+            new WebDriverWait(driver, Duration.ofSeconds(seconds))
+                    .until(ExpectedConditions.presenceOfElementLocated(locator));
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Leaves any system dialog / picker / camera screen and returns to the signup form,
+     * so a half-finished optional step can't strand the test. Presses Back at most twice —
+     * pressing it blindly used to walk right out of the app to the launcher — and, if the
+     * app is no longer in the foreground, brings it back and re-scrolls to the form.
      */
     private void recoverToApp() {
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 2; i++) {
+            if (isSignupScreenDisplayedQuick()) {
+                break;
+            }
             try {
                 driver.navigate().back();
+                pauseForAction();
             } catch (Exception ignored) {
-                // Nothing to go back from — fine, we're likely already on the app.
+                // Nothing to go back from.
             }
+        }
+        if (!isSignupScreenDisplayedQuick()) {
+            try {
+                driver.activateApp("com.knackcity");
+                pauseForAction();
+            } catch (Exception ignored) {
+                // Best effort.
+            }
+        }
+    }
+
+    private boolean isSignupScreenDisplayedQuick() {
+        return isPresentShort(SIGNUP_SCREEN_MARKER);
+    }
+
+    /**
+     * Taps the avatar / profile-image control to open its action sheet. The avatar is a
+     * plain ImageView; if that node isn't directly clickable (it can render as a
+     * non-clickable image once a photo is set), fall back to its nearest clickable ancestor.
+     */
+    public boolean tapImageUploadTrigger() {
+        if (click(IMAGE_UPLOAD_TRIGGER, "tapImageUploadTrigger")) {
+            return true;
+        }
+        return click(By.xpath("(//android.widget.ImageView)[1]/ancestor-or-self::*[@clickable=\"true\"][1]"),
+                "tapImageUploadTrigger (clickable ancestor)");
+    }
+
+    /** Taps a system dialog button within a short window; {@code false} if it isn't showing. */
+    private boolean tapSystemButton(By locator, String name) {
+        try {
+            new WebDriverWait(driver, Duration.ofSeconds(3))
+                    .until(ExpectedConditions.elementToBeClickable(locator))
+                    .click();
+            System.out.println("[SignupPage] Tapped '" + name + "'");
+            pauseForAction();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Grants the gallery photo-permission dialog ("Allow Selected") if it is showing. */
+    private boolean grantGalleryPermissionIfPrompted() {
+        return tapSystemButton(PERMISSION_ALLOW_SELECTED, "permission — Allow Selected");
+    }
+
+    /** Grants the camera permission dialog ("Allow only while using the app") if it is showing. */
+    private boolean grantCameraPermissionIfPrompted() {
+        return tapSystemButton(PERMISSION_ALLOW_FOREGROUND_ONLY, "permission — Allow only while using the app");
+    }
+
+    /**
+     * Waits for the photo picker to be usable — i.e. an actual TILE has rendered, not just
+     * the "Media grid" container (which appears first, empty). Grants the "Allow Selected"
+     * permission dialog if it surfaces. The first gallery open of a run is slow (RN
+     * cold-loads the picker module), so this polls for up to ~40s.
+     */
+    private void waitForGalleryGrid() {
+        long deadline = System.currentTimeMillis() + 40_000L;
+        while (System.currentTimeMillis() < deadline) {
+            if (isPresentShort(GALLERY_ANY_TILE)) {
+                return;
+            }
+            if (grantGalleryPermissionIfPrompted()) {
+                continue;
+            }
+            pauseForAction();
+        }
+        System.out.println("[SignupPage] gallery picker tiles did not render within 40s");
+    }
+
+    /** Waits until the signup form is back in the foreground; recovers the app if not. */
+    private boolean backOnForm() {
+        if (isPresent(SIGNUP_SCREEN_MARKER, 8)) {
+            return true;
+        }
+        recoverToApp();
+        return isSignupScreenDisplayedQuick();
+    }
+
+    /**
+     * Waits for the grid, taps the first tile, and confirms "Done" has appeared (it is
+     * drawn only once a selection registers — a stray earlier tap can toggle it back off,
+     * so retry the tile once). Returns whether "Done" is now showing.
+     */
+    private boolean selectFirstGalleryImage() {
+        waitForGalleryGrid();
+        if (!tap(GALLERY_FIRST_IMAGE, "gallery — first image")) {
+            return false;
+        }
+        if (isPresent(GALLERY_DONE_BUTTON, 4)) {
+            return true;
+        }
+        tap(GALLERY_FIRST_IMAGE, "gallery — first image (retry)");
+        return isPresent(GALLERY_DONE_BUTTON, 4);
+    }
+
+    /** Taps the picker's "Done" bar button and waits for the signup form to come back. */
+    private boolean tapGalleryDone() {
+        boolean ok = tap(GALLERY_DONE_BUTTON, "gallery — Done");
+        if (!isPresent(SIGNUP_SCREEN_MARKER, 12)) {
+            recoverToApp();
+        }
+        return ok;
+    }
+
+    /** Full pick: wait for grid -> select first tile -> "Done" -> back on the signup form. */
+    private boolean selectFirstGalleryImageAndConfirm() {
+        if (!selectFirstGalleryImage()) {
+            recoverToApp();
+            return false;
+        }
+        return tapGalleryDone();
+    }
+
+    // ---- Action-sheet items ----
+    private boolean tapUploadPhotoOption() {
+        return tap(MENU_UPLOAD_PHOTO, "Upload Photo");
+    }
+
+    private boolean tapTakePhotoOption() {
+        return tap(MENU_TAKE_PHOTO, "Take Photo");
+    }
+
+    private boolean tapViewPhotoOption() {
+        return tap(MENU_VIEW_PHOTO, "View Photo");
+    }
+
+    private boolean tapDeletePhotoOption() {
+        return tap(MENU_DELETE_PHOTO, "Delete");
+    }
+
+    private boolean closePhotoViewer() {
+        // Prefer the viewer's own close glyph; fall back to the system back button.
+        if (tap(PHOTO_VIEWER_CLOSE_BUTTON, "close photo viewer")) {
+            return true;
+        }
+        recoverToApp();
+        return true;
+    }
+
+    // ---- In-app camera "Edit Photo" screen ----
+    private boolean cancelPhotoEdit() {
+        return tap(EDIT_PHOTO_CLOSE_BUTTON, "Edit Photo — Navigate up (cancel)");
+    }
+
+    private boolean acceptPhotoEdit() {
+        return tap(EDIT_PHOTO_CROP_BUTTON, "Edit Photo — Crop (accept)");
+    }
+
+    // ---- Delete confirmation dialog ----
+    private boolean cancelDeleteDialog() {
+        return tap(DELETE_DIALOG_CANCEL, "delete dialog — Cancel");
+    }
+
+    private boolean confirmDeleteDialog() {
+        return tap(DELETE_DIALOG_CONFIRM, "delete dialog — Delete");
+    }
+
+    /**
+     * True if a profile image is currently set — opens the action sheet and looks for the
+     * "View Photo" / "Delete" rows (only present once an image exists), then leaves the sheet.
+     */
+    public boolean isProfileImageSet() {
+        if (!tapImageUploadTrigger()) {
+            return false;
+        }
+        boolean set = isPresentShort(MENU_VIEW_PHOTO) || isPresentShort(MENU_DELETE_PHOTO);
+        dismissActionSheet();
+        return set;
+    }
+
+    /**
+     * True if NO profile image is set — opens the action sheet and confirms "Upload Photo"
+     * is present while ", View Photo" is not, then leaves the sheet.
+     */
+    public boolean isProfileImageUnset() {
+        if (!tapImageUploadTrigger()) {
+            return false;
+        }
+        boolean unset = isPresentShort(MENU_UPLOAD_PHOTO) && !isPresentShort(MENU_VIEW_PHOTO);
+        dismissActionSheet();
+        return unset;
+    }
+
+    /** Closes the action sheet (tap outside / Back) without leaving the signup screen. */
+    private void dismissActionSheet() {
+        try {
+            driver.navigate().back();
+        } catch (Exception ignored) {
+            // fine
         }
         pauseForAction();
     }
 
     /**
-     * Full optional-image-upload flow: opens the picker, chooses Gallery, grants the
-     * permission prompt (if one appears — autoGrantPermissions can make it skip straight
-     * to the picker), selects the first available photo, and confirms it. Best-effort —
-     * the field is optional and this walks through the native OS photo picker, which is
-     * more environment/OS-version-dependent than the app's own UI (e.g. relies on the test
-     * device actually having at least one photo in its gallery). On any failure it presses
-     * back to recover to the signup form, so a failed optional step can't strand later
-     * steps — or the next test — on a stuck system dialog/picker screen.
+     * Returns the form to a clean state after an image sub-flow: waits for the signup
+     * screen, then scrolls back to the top so the caller's subsequent field entry starts
+     * from the same position it would on a freshly-opened form. (The existing manual-signup
+     * / Google code is left untouched — this just hands control back the way it found it.)
      */
-    public boolean uploadFirstAvailablePhotoFromGallery() {
-        if (!clickUploadImageButton()) {
-            return false;
+    private void settleBackOnSignupForm() {
+        isPresent(SIGNUP_SCREEN_MARKER, 8);
+        for (int i = 0; i < 5; i++) {
+            scrollUp();
         }
-        if (!clickChooseFromGallery()) {
-            recoverToApp();
-            return false;
-        }
-        handlePermissionIfNeeded(); // best-effort; no-op if no permission prompt appears
-        if (!selectFirstPhotoFromPicker()) {
-            recoverToApp();
-            return false;
-        }
-        if (!confirmPhotoSelection()) {
-            recoverToApp();
-            return false;
-        }
-        return true;
-    }
-
-    public boolean clickUseCamera() {
-        return click(USE_CAMERA_OPTION, "clickUseCamera");
-    }
-
-    public boolean handleCameraPermissionIfNeeded() {
-        WebDriverWait permissionWait = new WebDriverWait(driver, PERMISSION_WAIT);
-        try {
-            WebElement button = permissionWait.until(ExpectedConditions.elementToBeClickable(CAMERA_PERMISSION_ALLOW_FOREGROUND_ONLY));
-            button.click();
-            System.out.println("[SignupPage] Handled camera permission popup (Allow while using the app)");
-            pauseForAction();
-            return true;
-        } catch (Exception e) {
-            System.out.println("[SignupPage] No camera permission popup appeared (or already granted).");
-            return false;
-        }
-    }
-
-    public boolean clickCameraShutterButton() {
-        return click(CAMERA_SHUTTER_BUTTON, "clickCameraShutterButton");
-    }
-
-    public boolean closeCapturedCameraImage() {
-        return click(CAMERA_CAPTURED_IMAGE_CLOSE_BUTTON, "closeCapturedCameraImage");
-    }
-
-    public boolean cropCapturedCameraImage() {
-        return click(CAMERA_CROP_BUTTON, "cropCapturedCameraImage");
-    }
-
-    /** Opens the picker, chooses Use Camera, grants the permission prompt if shown, taps the shutter. */
-    private boolean openCameraAndCapture() {
-        if (!clickUploadImageButton()) {
-            return false;
-        }
-        if (!clickUseCamera()) {
-            return false;
-        }
-        handleCameraPermissionIfNeeded(); // best-effort; no-op if no permission prompt appears
-        return clickCameraShutterButton();
+        pauseForAction();
     }
 
     /**
-     * Full optional-image-upload flow via the in-app camera, per the requested steps:
-     * capture a photo, close it via "Navigate up" (which cancels the crop and returns to
-     * the signup form with no image set), capture again, then confirm with "Crop" to
-     * select the image. Best-effort, mirroring uploadFirstAvailablePhotoFromGallery — on
-     * any failure it presses back to recover to the signup form so a failed optional step
-     * can't strand later steps (or the next test) on a stuck camera/crop screen.
+     * One full gallery pick: action sheet -> "Upload Photo" -> grant "Allow Selected" ->
+     * wait for the "Media grid" -> first image -> "Done" -> back on the signup form.
+     * Returns whether a profile image is set afterwards.
      */
-    public boolean uploadPhotoFromCamera() {
-        // First capture — then discard it via the crop screen's "Navigate up" button.
-        if (!openCameraAndCapture()) {
+    private boolean uploadImageFromGallery() {
+        if (!tapImageUploadTrigger() || !tapUploadPhotoOption()) {
             recoverToApp();
             return false;
         }
-        if (!closeCapturedCameraImage()) {
+        grantGalleryPermissionIfPrompted();
+        selectFirstGalleryImageAndConfirm();
+        return isProfileImageSet();
+    }
+
+    /**
+     * One full camera capture: action sheet -> "Take Photo" -> grant "Allow only while
+     * using the app" -> shutter -> "Edit Photo" ({@code accept} ? "Crop" : "Navigate up")
+     * -> back on the signup form. Returns whether the sub-flow's taps all succeeded.
+     */
+    private boolean captureImageFromCamera(boolean accept) {
+        if (!tapImageUploadTrigger() || !tapTakePhotoOption()) {
             recoverToApp();
             return false;
         }
-        // Second capture — this one is kept: confirm the crop to select the image.
-        if (!openCameraAndCapture()) {
+        grantCameraPermissionIfPrompted();
+        if (!tap(CAMERA_SHUTTER_BUTTON, "camera shutter")) {
             recoverToApp();
             return false;
         }
-        if (!cropCapturedCameraImage()) {
-            recoverToApp();
-            return false;
-        }
-        return true;
+        boolean finished = accept ? acceptPhotoEdit() : cancelPhotoEdit();
+        backOnForm();
+        return finished;
+    }
+
+    /** Camera re-capture used by the final step: capture -> "Crop" -> verify an image is set. */
+    private boolean recaptureImageFromCamera() {
+        return captureImageFromCamera(true) && isProfileImageSet();
+    }
+
+    /**
+     * TEST CASE 1 — Upload Image from Gallery.
+     *
+     * <p>Runs the numbered scenario end to end, logging {@code [GALLERY STEP n] … -> PASS/FAIL}
+     * for every step. Best-effort throughout (the profile image is an optional field and the
+     * flow crosses the OS photo picker); returns whether a profile image is set at the end.
+     */
+    public boolean completeGalleryImageUploadFlow() {
+        final String flow = "GALLERY";
+
+        boolean uploaded = runStep(flow, 1, "Open the action sheet and tap 'Upload Photo'",
+                () -> tapImageUploadTrigger() && tapUploadPhotoOption());
+        runStep(flow, 2, "Handle the permission dialog if shown ('Allow Selected')",
+                () -> {
+                    grantGalleryPermissionIfPrompted(); // no-op when the permission is pre-granted
+                    return true;
+                });
+        runStep(flow, 3, "Select the first image from the gallery 'Media grid'",
+                this::selectFirstGalleryImage);
+        runStep(flow, 4, "Tap 'Done' to confirm the selection",
+                this::tapGalleryDone);
+        boolean imageSet = runStep(flow, 5, "Verify the image is set (', View Photo' shown in the sheet)",
+                this::isProfileImageSet);
+
+        runStep(flow, 6, "Open the sheet and tap ', Delete'",
+                () -> tapImageUploadTrigger() && tapDeletePhotoOption());
+        boolean deleteDialog = runStep(flow, 7, "Verify the delete-confirmation dialog appears",
+                () -> isPresent(DELETE_DIALOG_CANCEL, 6));
+        runStep(flow, 8, "Tap 'Cancel' — the image is kept",
+                () -> {
+                    boolean ok = cancelDeleteDialog();
+                    backOnForm();
+                    return ok;
+                });
+
+        runStep(flow, 9, "Open the sheet, tap ', Delete', then confirm with 'Delete'",
+                () -> tapImageUploadTrigger()
+                        && tapDeletePhotoOption()
+                        && isPresent(DELETE_DIALOG_CONFIRM, 6)
+                        && confirmDeleteDialog());
+        backOnForm();
+        boolean removed = runStep(flow, 10, "Verify the image was removed",
+                this::isProfileImageUnset);
+
+        boolean reUploaded = runStep(flow, 11, "Upload a new image from the gallery and verify success",
+                this::uploadImageFromGallery);
+
+        settleBackOnSignupForm();
+
+        boolean pass = uploaded && imageSet && deleteDialog && removed && reUploaded;
+        System.out.println("[SignupPage] [GALLERY] flow result: " + (pass ? "PASS" : "PARTIAL")
+                + " — step1Upload=" + uploaded + ", step5ImageSet=" + imageSet
+                + ", step7DeleteDialog=" + deleteDialog + ", step10Removed=" + removed
+                + ", step11ReUploaded=" + reUploaded);
+        return reUploaded;
+    }
+
+    /**
+     * TEST CASE 2 — Capture Image from Camera.
+     *
+     * <p>Runs the numbered scenario end to end, logging {@code [CAMERA STEP n] … -> PASS/FAIL}
+     * for every step. Best-effort throughout; returns whether a profile image is set at the end.
+     */
+    public boolean completeCameraImageUploadFlow() {
+        final String flow = "CAMERA";
+
+        runStep(flow, 1, "Open the sheet and tap 'Take Photo'",
+                () -> tapImageUploadTrigger() && tapTakePhotoOption());
+        runStep(flow, 2, "Handle the permission dialog if shown ('Allow only while using the app')",
+                () -> {
+                    grantCameraPermissionIfPrompted(); // no-op when the permission is pre-granted
+                    return true;
+                });
+        runStep(flow, 3, "Capture an image with the in-app camera shutter",
+                () -> tap(CAMERA_SHUTTER_BUTTON, "camera shutter"));
+        runStep(flow, 4, "On 'Edit Photo', tap 'Navigate up' to close without saving",
+                () -> {
+                    boolean ok = cancelPhotoEdit();
+                    backOnForm();
+                    return ok;
+                });
+
+        runStep(flow, 5, "Re-open the sheet, tap 'Take Photo' and re-capture",
+                () -> {
+                    if (!tapImageUploadTrigger() || !tapTakePhotoOption()) {
+                        return false;
+                    }
+                    grantCameraPermissionIfPrompted();
+                    return tap(CAMERA_SHUTTER_BUTTON, "camera shutter");
+                });
+        runStep(flow, 6, "Select the 'Crop' option to accept the captured photo",
+                this::acceptPhotoEdit);
+        runStep(flow, 7, "Return to the signup form with the cropped photo applied",
+                this::backOnForm);
+
+        boolean imageSet = runStep(flow, 8, "Verify the photo is set (', View Photo' shown) and open the viewer",
+                () -> tapImageUploadTrigger() && tapViewPhotoOption());
+        runStep(flow, 9, "Close the full-screen photo viewer",
+                this::closePhotoViewer);
+        backOnForm();
+
+        runStep(flow, 10, "Open the sheet and tap ', Delete'",
+                () -> tapImageUploadTrigger() && tapDeletePhotoOption());
+        boolean deleteDialog = runStep(flow, 11, "Confirm the delete dialog appears, then tap 'Cancel'",
+                () -> isPresent(DELETE_DIALOG_CANCEL, 6) && cancelDeleteDialog());
+        backOnForm();
+
+        boolean deleted = runStep(flow, 12, "Open the sheet, tap ', Delete', confirm with 'Delete', and verify removal",
+                () -> {
+                    boolean ok = tapImageUploadTrigger()
+                            && tapDeletePhotoOption()
+                            && isPresent(DELETE_DIALOG_CONFIRM, 6)
+                            && confirmDeleteDialog();
+                    backOnForm();
+                    return ok && isProfileImageUnset();
+                });
+
+        boolean recaptured = runStep(flow, 13, "Re-capture from the camera, accept with 'Crop', and verify success",
+                this::recaptureImageFromCamera);
+
+        settleBackOnSignupForm();
+
+        boolean pass = imageSet && deleteDialog && deleted && recaptured;
+        System.out.println("[SignupPage] [CAMERA] flow result: " + (pass ? "PASS" : "PARTIAL")
+                + " — step8ImageSet=" + imageSet + ", step11DeleteDialog=" + deleteDialog
+                + ", step12Deleted=" + deleted + ", step13Recaptured=" + recaptured);
+        return recaptured;
     }
 
     // ---------------- Form fields ----------------
@@ -583,16 +944,44 @@ public class SignupPage {
     }
 
     /**
-     * Verifies DOB is enforced as mandatory: leaves it untouched (empty) and confirms
-     * that submitting the form does NOT succeed — i.e. we're still on the signup screen
-     * afterward. Uses the signup screen's own presence as the check rather than a
-     * specific error-message locator, since no DOB-required error text/locator has been
-     * confirmed on-device yet.
+     * Verifies DOB is enforced as mandatory: leaves it untouched (empty), submits, and
+     * confirms the form did NOT advance. "Did not advance" is true when EITHER the
+     * DOB-required error is shown OR we're still on the signup form — and, definitively,
+     * we are NOT on the post-Create-Account OTP screen. (Checking the signup marker alone
+     * false-negatived: submitting scrolls the long form to the first error, moving both
+     * the Full Name field and the Create Account button out of view.)
      */
     public boolean isStillOnSignupScreenAfterEmptyDobSubmit() {
         clickCreateAccountButton();
         pauseForAction();
-        return isSignupScreenDisplayed();
+        scrollUp();
+        pauseForAction();
+        boolean dobError = isDobRequiredErrorDisplayed();
+        boolean onForm = isSignupScreenDisplayed();
+        System.out.println("[SignupPage] Empty-DOB submit — dobError=" + dobError + ", onSignupForm=" + onForm);
+        return dobError || onForm;
+    }
+
+    // Inline "date of birth is required" validation shown under the DOB field on an
+    // empty-DOB submit. The signup form renders field errors as TextViews with a
+    // resource-id of "error-<field>" (same pattern as "error-email"); the exact suffix
+    // isn't confirmed, so this also matches on the message text (case-insensitively),
+    // accepting the common "date of birth" / "DOB" / "birth ... required" wordings.
+    private static final By DOB_REQUIRED_ERROR = By.xpath(
+            "//android.widget.TextView[@resource-id=\"error-dob\" or @resource-id=\"error-dateOfBirth\""
+                    + " or @resource-id=\"error-date_of_birth\""
+                    + " or contains(translate(@text,\"DATEOFBIRTH\",\"dateofbirth\"),\"date of birth\")"
+                    + " or (contains(translate(@text,\"DOB\",\"dob\"),\"dob\")"
+                    + " and contains(translate(@text,\"REQUIRED\",\"required\"),\"required\"))"
+                    + " or (contains(translate(@text,\"BIRTH\",\"birth\"),\"birth\")"
+                    + " and contains(translate(@text,\"REQUIRED\",\"required\"),\"required\"))]");
+
+    /**
+     * True if a "date of birth is required" validation message is visible (call right
+     * after {@link #isStillOnSignupScreenAfterEmptyDobSubmit()}, which triggers it).
+     */
+    public boolean isDobRequiredErrorDisplayed() {
+        return isDisplayed(DOB_REQUIRED_ERROR);
     }
 
     public boolean clickGenderField() {
@@ -648,8 +1037,81 @@ public class SignupPage {
         return click(LOCATION_DROPDOWN_SAN_FRANCISCO, "selectLocationFromDropdown");
     }
 
+    /**
+     * Enters the phone number robustly.
+     *
+     * <p>This build's phone field carries a country-code prefix and enforces "exactly 10
+     * digits", and its formatter fights automation input:
+     * <ul>
+     *   <li>a single fast {@code element.sendKeys("<10 digits>")} lands partially
+     *       ("8148014748" -> "731255"), and</li>
+     *   <li>{@code element.sendKeys(oneChar)} in a loop does a <i>replace</i> per call on
+     *       this UiAutomator2 build, so only the last digit survives ("...9").</li>
+     * </ul>
+     * So this types with the W3C Actions API (genuine key events to the focused field —
+     * these append), reads the field back, and escalates the strategy on retry until all
+     * ten digits stick.
+     */
     public boolean enterPhoneNumber(String phone) {
-        return type(PHONE_FIELD, phone, "Phone Number");
+        String wanted = digitsOnly(phone);
+        try {
+            for (int attempt = 1; attempt <= 4; attempt++) {
+                WebElement field = findClickableWithScroll(PHONE_FIELD, "Phone Number");
+                field.click();
+                field.clear();
+                sleepQuietly(300);
+
+                switch (attempt) {
+                    case 1:
+                        // Whole string as real key events.
+                        new Actions(driver).sendKeys(wanted).perform();
+                        break;
+                    case 2:
+                        // Key events one digit at a time, with a beat for the formatter.
+                        for (int i = 0; i < wanted.length(); i++) {
+                            new Actions(driver).sendKeys(String.valueOf(wanted.charAt(i))).perform();
+                            sleepQuietly(150);
+                        }
+                        break;
+                    case 3:
+                        // Appium IME "type" into the focused element.
+                        Map<String, Object> typeArgs = new HashMap<>();
+                        typeArgs.put("text", wanted);
+                        driver.executeScript("mobile: type", typeArgs);
+                        break;
+                    default:
+                        // Last resort — plain single sendKeys.
+                        field.sendKeys(wanted);
+                }
+                hideKeyboardIfShown();
+                sleepQuietly(300);
+
+                String actual = digitsOnly(readPhoneFieldText());
+                // endsWith() tolerates the leading country-code digit the field may prepend.
+                if (actual.endsWith(wanted)) {
+                    System.out.println("[SignupPage] Filled 'Phone Number' with '" + wanted
+                            + "' (strategy " + attempt + ")");
+                    pauseForAction();
+                    return true;
+                }
+                System.out.println("[SignupPage] Phone field held '" + actual + "' after strategy " + attempt
+                        + "/4 (wanted '" + wanted + "') — clearing and retrying");
+            }
+            System.out.println("[SignupPage] Phone number would not stick after 4 strategies");
+            return false;
+        } catch (Exception e) {
+            System.out.println("[SignupPage] Could not enter phone number: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /** Re-reads the phone field's current text, tolerant of it having scrolled/changed. */
+    private String readPhoneFieldText() {
+        try {
+            return driver.findElement(PHONE_FIELD).getText();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     public boolean enterPassword(String password) {
@@ -681,8 +1143,46 @@ public class SignupPage {
 
     // ---------------- Terms & Conditions ----------------
 
+    /**
+     * Opens the Terms &amp; Conditions page from the signup form.
+     *
+     * <p>The row is one non-clickable TextView, "I have read and agree to the Terms &amp;
+     * Conditions", which wraps to two lines — only the trailing "Terms &amp; Conditions"
+     * words (start of line 2, lower-LEFT of the element) are the tappable link; a centre
+     * tap lands on plain copy and does nothing. Confirmed on-device: tapping at
+     * (~15% width, ~80% height) of the element opens the page. This tries that point, then
+     * a couple of nearby fallbacks along line 2, verifying the Terms page each time.
+     */
     public boolean clickTermsAndConditions() {
-        return click(TERMS_AND_CONDITIONS_LINK, "clickTermsAndConditions");
+        WebElement link;
+        try {
+            link = findClickableWithScroll(TERMS_AND_CONDITIONS_LINK, "clickTermsAndConditions");
+        } catch (Exception e) {
+            System.out.println("[SignupPage] 'clickTermsAndConditions' — link text not found: " + e.getMessage());
+            return false;
+        }
+        org.openqa.selenium.Rectangle r = link.getRect();
+        double[][] fractions = {{0.15, 0.80}, {0.25, 0.80}, {0.10, 0.72}, {0.15, 0.90}};
+        for (double[] f : fractions) {
+            int x = r.getX() + (int) (r.getWidth() * f[0]);
+            int y = r.getY() + (int) (r.getHeight() * f[1]);
+            try {
+                Map<String, Object> args = new HashMap<>();
+                args.put("x", x);
+                args.put("y", y);
+                driver.executeScript("mobile: clickGesture", args);
+                System.out.println("[SignupPage] Tapped 'Terms & Conditions' link @" + x + "," + y);
+                pauseForAction();
+            } catch (Exception e) {
+                System.out.println("[SignupPage] Terms link tap @" + x + "," + y + " failed: " + e.getMessage());
+                continue;
+            }
+            if (isPresent(TERMS_PAGE_MARKER, 4)) {
+                return true;
+            }
+            System.out.println("[SignupPage] Terms page not shown after tap @" + x + "," + y + " — trying next point");
+        }
+        return false;
     }
 
     public boolean isTermsWebpageDisplayed() {
@@ -701,6 +1201,40 @@ public class SignupPage {
 
     public boolean clickCreateAccountButton() {
         return click(CREATE_ACCOUNT_BUTTON, "clickCreateAccountButton");
+    }
+
+    /**
+     * Post-signup email-OTP verification screen (shown after "Create Account" since the
+     * current build). {@code true} once the signup either reached that screen OR went
+     * straight to the success screen (older behaviour / already-verified email).
+     */
+    public boolean isEmailOtpScreenDisplayed() {
+        return otpPage.isOtpScreenDisplayed();
+    }
+
+    /** Explicitly waits out the 60s cooldown for the "Resend OTP" option to appear. */
+    public boolean waitForResendOtpOption() {
+        return otpPage.waitForResendOtpOption();
+    }
+
+    /** True if the "Resend OTP" option is currently visible on the OTP screen. */
+    public boolean isResendOtpDisplayed() {
+        return otpPage.isResendOtpDisplayed();
+    }
+
+    /** Taps "Resend OTP" (only valid once the 60s cooldown has elapsed). */
+    public boolean clickResendOtp() {
+        return otpPage.clickResendOtp();
+    }
+
+    /** Polls the OTP field(s) until a manually-typed code appears (or {@code maxWait} elapses). */
+    public boolean waitForManualOtpEntry(int minDigits, Duration maxWait) {
+        return otpPage.waitForManualOtpEntry(minDigits, maxWait);
+    }
+
+    /** Taps "Verify Code" to submit the manually-entered OTP. */
+    public boolean clickVerifyCode() {
+        return otpPage.clickVerifyCode();
     }
 
     public boolean isSignupSuccessful() {

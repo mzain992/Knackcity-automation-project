@@ -27,6 +27,7 @@ public class BaseTest {
     public void setUp() throws MalformedURLException {
         dismissAnyLingeringSystemDialogs();
         clearAppData();
+        grantRuntimePermissions();
 
         UiAutomator2Options options = new UiAutomator2Options();
         options.setDeviceName(DEVICE_NAME);
@@ -46,6 +47,14 @@ public class BaseTest {
         // full 10s before returning, measured on-device. Disabling it drops each lookup
         // to ~0.2-0.5s and removes a major source of flaky/slow element waits app-wide.
         options.setCapability("appium:waitForIdleTimeout", 0);
+        // This device is slow to spin up the UiAutomator2 instrumentation on a cold start
+        // (seen intermittently: "The instrumentation process cannot be initialized within
+        // 30000ms timeout"). Give it more headroom, and let Appium reinstall the helper
+        // servers if a stale/broken copy is the cause.
+        options.setCapability("appium:uiautomator2ServerLaunchTimeout", 90000);
+        options.setCapability("appium:uiautomator2ServerInstallTimeout", 90000);
+        options.setCapability("appium:uiautomator2ServerReadTimeout", 90000);
+        options.setCapability("appium:enforceAppInstall", false);
         // autoWebview is intentionally NOT set here: it makes UiAutomator2 switch to a
         // WebView context immediately on session start, which fails with
         // "SessionNotCreatedException: No such context found" because this app launches
@@ -126,6 +135,66 @@ public class BaseTest {
         } catch (Exception e) {
             System.out.println("[BaseTest] Failed to clear app data before test: " + e.getMessage());
         }
+    }
+
+    /**
+     * Pre-grants the media/camera runtime permissions the signup profile-image flow needs.
+     *
+     * <p>{@code pm clear} above wipes every runtime grant, and {@code autoGrantPermissions}
+     * does NOT reliably cover the Android 13+ {@code READ_MEDIA_*} permissions on this
+     * device (confirmed on-device: after a clear the app's "Upload Photo" lands on an
+     * in-app "Permission is blocked — Open Settings" screen and the system picker never
+     * opens, because {@code READ_MEDIA_IMAGES} / {@code READ_MEDIA_VISUAL_USER_SELECTED}
+     * stay {@code granted=false}). Granting them here via adb — the same mechanism as the
+     * clear above — makes the gallery picker open directly. The camera flow's own
+     * "Allow only while using the app" dialog still gets exercised when it appears; this
+     * only removes the dead-end. Best-effort per permission: some may not exist on older
+     * OS levels, and a failed grant must not abort the test.
+     */
+    private void grantRuntimePermissions() {
+        String[] permissions = {
+                "android.permission.CAMERA",
+                "android.permission.READ_MEDIA_IMAGES",
+                "android.permission.READ_MEDIA_VIDEO",
+                "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+                "android.permission.READ_EXTERNAL_STORAGE",
+        };
+        for (String permission : permissions) {
+            try {
+                new ProcessBuilder("adb", "-s", DEVICE_NAME, "shell", "pm", "grant", APP_PACKAGE, permission)
+                        .redirectErrorStream(true)
+                        .start()
+                        .waitFor();
+            } catch (Exception e) {
+                System.out.println("[BaseTest] Could not grant " + permission + ": " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Restarts the app to a deterministic freshly-installed state WITHOUT tearing down the
+     * Appium session. Needed by tests that chain several sub-scenarios in a single session
+     * (e.g. {@code SignInTest.executeSignInTestCases}) once one of those sub-scenarios has
+     * actually authenticated and navigated away from the screen under test — clearing app
+     * data and relaunching is the only reliable way back to the onboarding carousel from
+     * the post-login home screen. Mirrors what {@link #setUp()} does per test, minus
+     * creating a new driver.
+     */
+    protected void restartAppWithClearedData() {
+        System.out.println("[BaseTest] Restarting app with cleared data (in-session reset)");
+        try {
+            driver.terminateApp(APP_PACKAGE);
+        } catch (Exception e) {
+            System.out.println("[BaseTest] terminateApp failed (continuing): " + e.getMessage());
+        }
+        dismissAnyLingeringSystemDialogs();
+        clearAppData();
+        try {
+            driver.activateApp(APP_PACKAGE);
+        } catch (Exception e) {
+            System.out.println("[BaseTest] activateApp failed: " + e.getMessage());
+        }
+        handleInitialPermissionDialogIfPresent();
     }
 
     @AfterMethod
