@@ -146,7 +146,7 @@ public class OnboardingTest extends BaseTest {
         Assert.assertTrue(signupPage.isSignupScreenDisplayed(),
                 "Signup screen was not displayed after onboarding");
 
-        logStep("STEP 3: Profile image via GALLERY — upload, view, delete (Cancel then Delete), re-upload");
+        logStep("STEP 3: Profile image via GALLERY — upload, verify, delete (Cancel then Delete), re-upload");
         boolean imageUploaded = signupPage.completeGalleryImageUploadFlow();
         logStep("Gallery profile-image flow " + (imageUploaded
                 ? "succeeded (image set)"

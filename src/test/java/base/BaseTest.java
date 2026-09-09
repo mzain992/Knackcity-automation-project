@@ -27,6 +27,7 @@ public class BaseTest {
     public void setUp() throws MalformedURLException {
         dismissAnyLingeringSystemDialogs();
         clearAppData();
+        grantRuntimePermissions();
 
         UiAutomator2Options options = new UiAutomator2Options();
         options.setDeviceName(DEVICE_NAME);
@@ -133,6 +134,40 @@ public class BaseTest {
                     .waitFor();
         } catch (Exception e) {
             System.out.println("[BaseTest] Failed to clear app data before test: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Pre-grants the media/camera runtime permissions the signup profile-image flow needs.
+     *
+     * <p>{@code pm clear} above wipes every runtime grant, and {@code autoGrantPermissions}
+     * does NOT reliably cover the Android 13+ {@code READ_MEDIA_*} permissions on this
+     * device (confirmed on-device: after a clear the app's "Upload Photo" lands on an
+     * in-app "Permission is blocked — Open Settings" screen and the system picker never
+     * opens, because {@code READ_MEDIA_IMAGES} / {@code READ_MEDIA_VISUAL_USER_SELECTED}
+     * stay {@code granted=false}). Granting them here via adb — the same mechanism as the
+     * clear above — makes the gallery picker open directly. The camera flow's own
+     * "Allow only while using the app" dialog still gets exercised when it appears; this
+     * only removes the dead-end. Best-effort per permission: some may not exist on older
+     * OS levels, and a failed grant must not abort the test.
+     */
+    private void grantRuntimePermissions() {
+        String[] permissions = {
+                "android.permission.CAMERA",
+                "android.permission.READ_MEDIA_IMAGES",
+                "android.permission.READ_MEDIA_VIDEO",
+                "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+                "android.permission.READ_EXTERNAL_STORAGE",
+        };
+        for (String permission : permissions) {
+            try {
+                new ProcessBuilder("adb", "-s", DEVICE_NAME, "shell", "pm", "grant", APP_PACKAGE, permission)
+                        .redirectErrorStream(true)
+                        .start()
+                        .waitFor();
+            } catch (Exception e) {
+                System.out.println("[BaseTest] Could not grant " + permission + ": " + e.getMessage());
+            }
         }
     }
 
